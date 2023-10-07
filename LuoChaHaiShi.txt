@@ -2,6 +2,7 @@ title=罗刹海市
 subtitle=《聊斋志异》卷四之《罗刹海市》新编
 composer=刀郎 词曲
 arranger=指弹冰 记谱
+piece=讽刺的
 1=D
 4=150
 % dedication=讽刺的
