@@ -195,9 +195,9 @@ def all_scores_start(inDat):
     if has_lyrics:
         r += r"""
   % Might need to enforce a minimum spacing between systems, especially if lyrics are below the last staff in a system and numbers are on the top of the next
-  system-system-spacing = #'((basic-distance . 7) (padding . 5) (stretchability . 1e7))
-  score-markup-spacing = #'((basic-distance . 9) (padding . 5) (stretchability . 1e7))
-  score-system-spacing = #'((basic-distance . 9) (padding . 5) (stretchability . 1e7))
+  system-system-spacing = #'((basic-distance . 7) (padding . 4) (stretchability . 1e7))
+  score-markup-spacing = #'((basic-distance . 9) (padding . 4) (stretchability . 1e7))
+  score-system-spacing = #'((basic-distance . 9) (padding . 4) (stretchability . 1e7))
   markup-system-spacing = #'((basic-distance . 2) (padding . 2) (stretchability . 0))
 """
     r += "}\n"  # end of \paper block
