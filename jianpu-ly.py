@@ -162,7 +162,8 @@ def all_scores_start(inDat):
   print-all-headers = ##t %% allow per-score headers
 
   % un-comment the next line for A5:
-  % #(set-default-paper-size "a5" )
+  #(set-default-paper-size "letter" )
+  #(set-paper-size "letter")
 
   % un-comment the next line for no page numbers:
   % print-page-number = ##f
