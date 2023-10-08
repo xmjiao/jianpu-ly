@@ -229,7 +229,8 @@ def score_end(**headers):
         ret += "}\n"
     if midi:
         # will be overridden by any \tempo command used later
-        ret += r"\midi { \context { \Score tempoWholesPerMinute = #(ly:make-moment 84 4)}}"
+        #ret += r'\midi { \context { \Score midiInstrument = "flute" tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
+        ret += r'\midi { \context { \Score tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
     elif notehead_markup.noBarNums:
         ret += r'\layout { \context { \Score \remove "Bar_number_engraver" } }'
     else:
@@ -1310,7 +1311,7 @@ def getLY(score, headers=None):
                 elif re.match("letter[A-Z]$", word):
                     # TODO: not compatible with key change at same point, at least not in lilypond 2.20 (2nd mark mentioned will be dropped)
                     out.append(r'\mark \markup { \box { "%s" } }' % word[-1])
-                elif re.match(r"R\*[1-9][0-9]*$", word):
+                elif re.match(r"R\*[1-9][0-9\/]*$", word):
                     if not western:
                         # \compressFullBarRests on Lilypond 2.20, \compressEmptyMeasures on 2.22, both map to \set Score.skipBars
                         out.append(
