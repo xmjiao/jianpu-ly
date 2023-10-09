@@ -229,12 +229,13 @@ def score_end(**headers):
         ret += "}\n"
     if midi:
         # will be overridden by any \tempo command used later
-        #ret += r'\midi { \context { \Score midiInstrument = "flute" tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
-        ret += r'\midi { \context { \Score tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
+        ret += r'\midi { \context { \Score midiInstrument = "flute" tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
+        # ret += r'\midi { \context { \Score tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
     elif notehead_markup.noBarNums:
         ret += r'\layout { \context { \Score \remove "Bar_number_engraver" } }'
     else:
-        ret += r"\layout{}"
+        # ret += r"\layout{}"
+        ret += r"\layout { \context { \Score \override TimeSignature.break-visibility = #'#(#f #t #t) } }"
     return ret + " }"
 
 
