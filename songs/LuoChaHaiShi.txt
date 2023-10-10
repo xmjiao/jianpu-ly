@@ -1,7 +1,7 @@
 title=罗刹海市
 subtitle=《聊斋志异》里同名小说改编
 composer=刀郎 词曲
-arranger=指弹冰 证谱
+arranger=指弹冰 较谱
 piece=诙谐的。7/4拍切分为3+4。8/4拍切分为3+3+2。
 1=D
 4=150
