@@ -860,19 +860,15 @@ def merge_lyrics(content):
 def getInput0():
     inDat = []
     for f in sys.argv[1:]:
-        if f.endswith(".mxl"):
-            inDat.append(re.sub(r"<[?]xml.*?/container>\s*", "", getoutput("unzip -qc "+quote(
-                f)).replace("application/vnd.recordare.musicxml", "").strip(), flags=re.DOTALL))
-        else:
+        try:
             try:
-                try:
-                    # Python 3: try UTF-8 first
-                    inDat.append(merge_lyrics(open(f, encoding="utf-8").read()))
-                except FileNotFoundError:
-                    # Python 2, or Python 3 with locale-default encoding in case it's not UTF-8
-                    inDat.append(merge_lyrics(open(f).read()))
-            except IOError:
-                errExit("Unable to read file "+f)
+                # Python 3: try UTF-8 first
+                inDat.append(merge_lyrics(open(f, encoding="utf-8").read()))
+            except FileNotFoundError:
+                # Python 2, or Python 3 with locale-default encoding in case it's not UTF-8
+                inDat.append(merge_lyrics(open(f).read()))
+        except IOError:
+            errExit("Unable to read file "+f)
     if inDat:
         return inDat
     if not sys.stdin.isatty():
@@ -901,146 +897,8 @@ def get_input():
         if inDat[i].startswith(r'\version'):
             errExit(
                 "jianpu-ly does not READ Lilypond code.\nPlease see the instructions.")
-        elif inDat[i].startswith("<?xml"):
-            inDat[i] = xml2jianpu(inDat[i])
 
     return " NextScore ".join(inDat)
-
-
-def xml2jianpu(x):
-    from xml.parsers.expat import ParserCreate
-    xmlparser = ParserCreate()
-    ret = []
-    dat = ["", ""]
-    partList = [""]
-    time = ["4", "4"]
-    tempo = ["4", "60"]
-    note = [[""]*10]
-    naturalType = [""]
-    note1 = ["C"]
-    tSig = [None, 0]
-    prevChord = [None]
-    types = {"64th": "h", "32nd": "d", "16th": "s", "eighth": "q",
-             "quarter": "", "half": " -", "whole": " - - -"}
-    typesDot = {"64th": "h.", "32nd": "d.", "16th": "s.", "eighth": "q.",
-                "quarter": ".", "half": " - -", "whole": " - - - - -"}
-    typesMM = {"64th": "64", "32nd": "32", "16th": "16",
-               "eighth": "8", "quarter": "4", "half": "2", "whole": "1"}
-    quavers = {"64th": 0.125, "32nd": 0.25, "16th": 0.5,
-               "eighth": 1, "quarter": 2, "half": 4, "whole": 8}
-
-    def s(name, attrs): dat[0], dat[1] = "", attrs.get("type", "")
-    def c(data): dat[0] += data
-
-    def e(name):
-        d0 = dat[0].strip()
-        if name in ['work-title', 'movement-title']:
-            ret.append('title='+d0)
-        elif name == 'creator' and dat[1] == "composer":
-            ret.append('composer='+d0)
-        elif name == "part-name" or name == "instrument-name":
-            partList[-1] = d0
-        elif name == "score-part":
-            partList.append("")
-        elif name == "part":  # we're assuming score-partwise
-            if partList:
-                ret.append('instrument='+partList[0])
-                del partList[0]
-            ret.append("WithStaff NextPart")
-        elif name == "fifths":
-            if d0.startswith('-'):
-                naturalType[0] = '#'
-            else:
-                naturalType[0] = 'b'
-            key = ["Gb", "Db", "Ab", "Eb", "Bb", "F", "C",
-                   "G", "D", "A", "E", "B", "F#"][int(d0)+6]
-            note1[0] = key[0]
-            ret.append("1="+key)
-        elif name == "beats":
-            time[0] = d0
-        elif name == "beat-type":
-            time[1] = d0
-        elif name == "time":
-            # so anacrusis logic can come back and add to this
-            tSig[0] = len(ret)
-            tSig[1] = 0  # count quavers in 1st bar
-            ret.append("/".join(time))
-        elif name == "backup" or name == "forward":
-            errExit("MusicXML import: multiple voices per part not implemented")
-        elif name == "measure" and not tSig[0] == None:
-            if not tSig[1] == int(time[0])*8/int(time[1]):
-                ret[tSig[0]] += ","+{0.5: "16", 0.75: "16.", 1: "8", 1.5: "8.", 2: "4",
-                                     3: "4.", 4: "2", 6: "2.", 8: "1", 12: "1."}[tSig[1]]  # anacrusis
-            tSig[0] = None
-        elif name == "beat-unit":
-            tempo[0] = typesMM.get(name, "4")
-        elif name == "beat-minute":
-            tempo[1] = d0
-        elif name == "metronome":
-            ret.append("=".join(tempo))
-        elif name == "step":
-            note[0][0] = d0
-        elif name == "rest":
-            note[0][0] = "r"
-        elif name == "octave":
-            note[0][1] = int(d0)
-        elif name == "accidental":
-            # TODO: what if it's natural-ing something that wasn't sharp or flat in the key signature
-            note[0][2] = {"flat": "b", "sharp": "#",
-                          "natural": naturalType[0]}.get(d0, "")
-        elif name == "type":
-            note[0][3] = d0
-        elif name == "dot":
-            note[0][4] = 1
-        elif name == "slur":
-            note[0][5] = {"start": "(", "stop": ")"}[dat[1]]
-        elif name == "tie":
-            note[0][6] = {"start": "~", "stop": ""}[dat[1]]
-        elif name == "actual-notes":
-            note[0][7] = d0
-        elif name == "tuplet":
-            note[0][8] = dat[1]
-        elif name == "chord":
-            note[0][9] = True
-        elif name == "note":
-            step, octave, acc, nType, dot, slur, tie, tuplet, tState, chord = note[0]
-            note[0] = [""]*10
-            if step == "r":
-                r = "0"
-            else:
-                dTone = ord(step[0])-ord(note1[0])+7*(octave-4)
-                if step[0] < 'C':
-                    dTone += 7
-                r = str((dTone % 7)+1)
-                while dTone < 0:
-                    r += ","
-                    dTone += 7
-                while dTone > 6:
-                    r += "'"
-                    dTone -= 7
-            if chord:
-                ret[prevChord[0]] += r
-                return
-            if tState == "start":
-                ret.append(tuplet+"[")
-            if not tSig[0] == None:  # we're counting the length of the first bar, for anacrusis
-                tSig[1] += quavers[nType]
-                if dot:
-                    tSig[1] += quavers[nType]/2.0
-            if dot:
-                d = typesDot
-            else:
-                d = types
-            r += acc+d[nType]+' '
-            prevChord[0] = len(ret)
-            ret.append(r[:r.index(' ')]+' '+tie+' '+slur+r[r.index(' '):])
-            if tState == "stop":
-                ret.append("]")
-    xmlparser.StartElementHandler = s
-    xmlparser.CharacterDataHandler = c
-    xmlparser.EndElementHandler = e
-    xmlparser.Parse(x, True)
-    return '\n'.join(ret)
 
 
 def fix_utf8(stream, mode):
