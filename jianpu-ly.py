@@ -81,6 +81,8 @@ import sys
 import os
 import re
 import shutil
+import argparse
+
 from fractions import Fraction as F  # requires Python 2.6+
 if type(u"") == type(""):  # Python 3
     unichr, xrange = chr, range
@@ -427,15 +429,16 @@ def addOctaves(octave1, octave2):
 
 
 class NoteheadMarkup:
-    def __init__(self):
+    def __init__(self, withStaff=True):
         self.defines_done = {}
+        self.withStaff = withStaff
         self.initOneScore()
 
     def initOneScore(self):
         self.barLength = 64
         self.beatLength = 16  # in 64th notes
         self.barPos = self.startBarPos = F(0)
-        self.inBeamGroup = self.lastNBeams = self.onePage = self.noBarNums = self.separateTimesig = self.withStaff = 0
+        self.inBeamGroup = self.lastNBeams = self.onePage = self.noBarNums = self.separateTimesig = 0
         self.keepLength = 0
         self.last_octave = self.base_octave = ""
         self.current_accidentals = {}
@@ -857,18 +860,19 @@ def merge_lyrics(content):
     return content
 
 
-def getInput0():
+def getInput0(f):
     inDat = []
-    for f in sys.argv[1:]:
+
+    try:
         try:
-            try:
-                # Python 3: try UTF-8 first
-                inDat.append(merge_lyrics(open(f, encoding="utf-8").read()))
-            except FileNotFoundError:
-                # Python 2, or Python 3 with locale-default encoding in case it's not UTF-8
-                inDat.append(merge_lyrics(open(f).read()))
-        except IOError:
-            errExit("Unable to read file "+f)
+            # Python 3: try UTF-8 first
+            inDat.append(merge_lyrics(open(f, encoding="utf-8").read()))
+        except FileNotFoundError:
+            # Python 2, or Python 3 with locale-default encoding in case it's not UTF-8
+            inDat.append(merge_lyrics(open(f).read()))
+    except IOError:
+        errExit("Unable to read file "+f)
+
     if inDat:
         return inDat
     if not sys.stdin.isatty():
@@ -888,8 +892,8 @@ def getInput0():
     raise SystemExit
 
 
-def get_input():
-    inDat = getInput0()
+def get_input(infile):
+    inDat = getInput0(infile)
 
     for i in xrange(len(inDat)):
         if inDat[i].startswith('\xef\xbb\xbf'):
@@ -1223,10 +1227,7 @@ def getLY(score, headers=None):
                             "WARNING: Duplicate angka, did you miss out a NextScore?\n")
                     not_angka = True
                 elif word == "WithStaff":
-                    if notehead_markup.withStaff:
-                        sys.stderr.write(
-                            "WARNING: Duplicate WithStaff, did you miss out a NextScore?\n")
-                    notehead_markup.withStaff = 1
+                    pass
                 elif word == "PartMidi":
                     pass  # handled in process_input
                 elif word == "R{":
@@ -1438,7 +1439,7 @@ def getLY(score, headers=None):
     return out, maxBeams, lyrics, headers
 
 
-def process_input(inDat):
+def process_input(inDat, withStaff=False):
     global unicode_mode
     unicode_mode = not not re.search(r"\sUnicode\s", " "+inDat+" ")
     if unicode_mode:
@@ -1446,7 +1447,7 @@ def process_input(inDat):
     ret = []
     global scoreNo, western, has_lyrics, midi, not_angka, maxBeams, uniqCount, notehead_markup
     uniqCount = 0
-    notehead_markup = NoteheadMarkup()
+    notehead_markup = NoteheadMarkup(withStaff)
     scoreNo = 0  # incr'd to 1 below
     western = False
     for score in re.split(r"\sNextScore\s", " "+inDat+" "):
@@ -1531,7 +1532,7 @@ except:
     def quote(f): return "'"+f.replace("'", "'\"'\"'")+"'"
 
 
-def write_output(outDat):
+def write_output(outDat, fn, infile):
     if sys.stdout.isatty():
         if unicode_mode:
             if sys.platform == 'win32' and sys.version_info() < (3, 6):
@@ -1543,22 +1544,23 @@ For Unicode approximation on this system, please do one of these things:
 (3) switch from Microsoft Windows to GNU/Linux""")
                 return
         else:  # normal Lilypond
-            # They didn't redirect our output.
-            # Try to be a little more 'user friendly'
-            # and see if we can put it in a temporary
-            # Lilypond file and run Lilypond for them.
-            # New in jianpu-ly v1.61.
-            if len(sys.argv) > 1:
-                fn = os.path.split(sys.argv[1])[1]
-            else:
-                fn = 'jianpu'
-            if os.extsep in fn:
-                fn = fn[:-fn.rindex(os.extsep)]
-            fn += ".ly"
-            import tempfile
-            cwd = os.getcwd()
-            os.chdir(tempfile.gettempdir())
-            print("Outputting to "+os.getcwd()+"/"+fn)
+            if not fn:
+                # They didn't redirect our output.
+                # Try to be a little more 'user friendly'
+                # and see if we can put it in a temporary
+                # Lilypond file and run Lilypond for them.
+                # New in jianpu-ly v1.61.
+                if len(sys.argv) > 1:
+                    fn = os.path.split(infile)[1]
+                else:
+                    fn = 'jianpu'
+                if os.extsep in fn:
+                    fn = fn[:-fn.rindex(os.extsep)]
+                fn += ".ly"
+                import tempfile
+                cwd = os.getcwd()
+                os.chdir(tempfile.gettempdir())
+                print("Outputting to "+os.getcwd()+"/"+fn)
             o = open(fn, 'w')
             fix_utf8(o, 'w').write(outDat)
             o.close()
@@ -1585,13 +1587,70 @@ For Unicode approximation on this system, please do one of these things:
     fix_utf8(sys.stdout, 'w').write(outDat)
 
 
+def filter_out_jianpu(lilypond_text):
+    """
+    This function accepts a LilyPond formatted text string as input and removes
+    any section between the lines that start with "%% === BEGIN JIANPU STAFF ==="
+    and "% === END JIANPU STAFF ===" (both lines inclusive).
+
+    Parameters:
+    lilypond_text (str): String containing LilyPond notation
+
+    Returns:
+    str: The modified LilyPond text with all JIANPU sections removed
+    """
+
+    begin_jianpu = "\n%% === BEGIN JIANPU STAFF ===\n"
+    end_jianpu = "\n% === END JIANPU STAFF ===\n"
+
+    while True:
+        start_index = lilypond_text.find(begin_jianpu)
+        end_index = lilypond_text.find(end_jianpu) + len(end_jianpu)
+
+        if start_index != -1 and end_index != -1:
+            # Remove the JIANPU section
+            lilypond_text = lilypond_text[:start_index] + lilypond_text[end_index:]
+        else:
+            # No more JIANPU sections exist, so break from the loop
+            break
+
+    return lilypond_text
+
+
 def main():
-    if "--html" in sys.argv or "--markdown" in sys.argv:
+    # Create ArgumentParser object
+    parser = argparse.ArgumentParser()
+
+    # Define command-line options
+    parser.add_argument('--html', action='store_true', default=False,
+                        help="output in HTML format")
+    parser.add_argument('-m', '--markdown', action='store_true', default=False,
+                        help="output in Markdown format")
+    parser.add_argument('-s', '--staff-only', action='store_true',
+                        default=False, help="only output Staff sections")
+    parser.add_argument('-o', '--with-staff', action='store_true',
+                        default=False, help="output with Staff sections")
+
+    # Add positional arguments
+    parser.add_argument('input_file', help="input file name")
+    parser.add_argument('output_file', nargs='?', default='',
+                        help="output file name (optional)")
+
+    # Parse options from command line
+    args = parser.parse_args()
+
+    if args.html or args.markdown:
         return write_docs()
-    inDat = get_input()
+
+    inDat = get_input(args.input_file)
+
     # <-- you can also call this if importing as a module
-    out = process_input(inDat)
-    write_output(out)
+    out = process_input(inDat, args.staff_only or args.with_staff)
+
+    if args.staff_only:
+        out = filter_out_jianpu(out)
+
+    write_output(out, args.output_file, args.input_file)
 
 
 if __name__ == "__main__":
