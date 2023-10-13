@@ -1561,6 +1561,9 @@ For Unicode approximation on this system, please do one of these things:
                 cwd = os.getcwd()
                 os.chdir(tempfile.gettempdir())
                 print("Outputting to "+os.getcwd()+"/"+fn)
+            else:
+                cwd = None
+
             o = open(fn, 'w')
             fix_utf8(o, 'w').write(outDat)
             o.close()
@@ -1582,7 +1585,8 @@ For Unicode approximation on this system, please do one of these things:
                     subprocess.Popen([quote(pdf)], shell=True)
                 elif hasattr(shutil, 'which') and shutil.which('evince'):
                     os.system("evince "+quote(pdf))
-            os.chdir(cwd)
+            if cwd:
+                os.chdir(cwd)
             return
     fix_utf8(sys.stdout, 'w').write(outDat)
 
