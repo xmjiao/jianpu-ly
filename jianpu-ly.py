@@ -987,23 +987,47 @@ def graceNotes_markup(notes, isAfter):
     return r"^\tweak outside-staff-priority ##f ^\tweak avoid-slur #'inside ^\markup \%s { \line { %s } }" % (cmd, ' '.join(r))
 
 
+import re
+
 def grace_octave_fix(notes):
+    """
+    This function takes a string of notes in jianpu notation and applies the following fixes:
+    1. Moves '+ and ,+ to before the preceding number
+    2. Replaces 8 and 9 with the respective higher octave notes
+
+    Args:
+    notes (str): A string of notes in jianpu notation
+
+    Returns:
+    str: A string of notes with the above fixes applied
+    """
+
+    # Move '+ and ,+ to before the preceding number
+    notes = re.sub(r"([1-9])(')+", r'\2\1', notes)
+    notes = re.sub(r"([1-9])(,)+", r'\2\1', notes)
+
+    # Replacing 8 and 9 with the respective higher octave notes
     notes = notes.replace("8", "'1").replace("9", "'2")
-    if notes.endswith(',,') or notes.endswith("''"):
-        # oops, should write this BEFORE the affected note
-        return notes[:-3]+notes[-2:]+notes[-3]
-    elif notes.endswith(',') or notes.endswith("'"):
-        return notes[:-2]+notes[-1]+notes[-2]
-    else:
-        return notes
+
+    return notes
 
 
 def gracenotes_western(notes):
+    """
+    Converts a list of Jiapu-style grace notes to LilyPond notation.
+
+    Args:
+    notes (list): A list of grace notes in Jianpu notation.
+
+    Returns:
+    str: A string of LilyPond notation representing the grace notes.
+    """
+
     # for western and MIDI staffs
     notes = grace_octave_fix(notes)
+
     nextAcc = ""
     next8ve = "'"
-    current_accidentals = [0]*7
     r = []
     for i in xrange(len(notes)):
         n = notes[i]
@@ -1026,11 +1050,12 @@ def gracenotes_western(notes):
             else:
                 next8ve = ""
         else:
-            if not n in placeholders:
+            if n not in placeholders:
                 continue  # TODO: errExit ?
             r.append(placeholders[n]+nextAcc+next8ve+"16")
             nextAcc = ""
             next8ve = "'"
+
     return ' '.join(r)
 
 
@@ -1277,10 +1302,10 @@ def getLY(score, headers=None):
                 elif word == ']':  # tuplet end
                     out.append("}")
                     notehead_markup.tuplet = (1, 1)
-                elif re.match(r"g\[[#b',1-9]+\]$", word):
+                elif re.match(r"g\[[#b',1-9\s]+\]$", word):
                     if midi or western:
                         out.append(
-                            r"\grace { " + gracenotes_western(word[2:-1]) + " }")
+                            r"\acciaccatura { " + gracenotes_western(word[2:-1]) + " }")
                     else:
                         aftrnext = graceNotes_markup(word[2:-1], 0)
                         if not notehead_markup.withStaff:
@@ -1568,6 +1593,7 @@ For Unicode approximation on this system, please do one of these things:
             fix_utf8(o, 'w').write(outDat)
             o.close()
             pdf = fn[:-3]+'.pdf'
+
             try:
                 os.remove(pdf)  # so won't show old one if lilypond fails
             except:
@@ -1579,7 +1605,7 @@ For Unicode approximation on this system, please do one of these things:
                     cmd += ' -dstrokeadjust'
                 os.system(cmd+" "+quote(fn))
                 if sys.platform == 'darwin':
-                    os.system("open "+quote(pdf))
+                    os.system("open "+quote(pdf.replace('..pdf', '.pdf')))
                 elif sys.platform.startswith('win'):
                     import subprocess
                     subprocess.Popen([quote(pdf)], shell=True)
