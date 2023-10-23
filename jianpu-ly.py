@@ -1764,7 +1764,7 @@ def set_output_file(args, input_text):
 
 def convert_midi_to_mp3(base_name):
     # construct the command
-    command = f"timidity {base_name}.midi -Ow -o - | ffmpeg -i - -acodec libmp3lame -y {base_name}.mp3"
+    command = f"timidity {base_name}.midi -Ow -o - | lame - -b 192 {base_name}.mp3"
 
     # execute the command
     process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
