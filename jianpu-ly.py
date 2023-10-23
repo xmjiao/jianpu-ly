@@ -836,7 +836,8 @@ def write_docs():
 
 def merge_lyrics(content):
     """
-    Merges all lines starting with "H:" in the given content and replaces the first "H:" line with the merged line.
+    Merge all lines starting with "H:" in each part of the the given content (separated by "NextPart")
+    and replaces the first "H:" line in each part with the merged line.
 
     Args:
         content (str): The content to process.
@@ -845,19 +846,25 @@ def merge_lyrics(content):
         str: The processed content.
     """
 
-    # Extract all lines starting with "H:" and merge them
-    h_lines = re.findall(r'^H:.*$', content, re.MULTILINE)
-    merged_line = "H:" + ' '.join([line[2:].strip() for line in h_lines])
+    def process_part(part):
+        # Extract all lines starting with "H:" and merge them
+        h_lines = re.findall(r'^H:.*$', part, re.MULTILINE)
+        merged_line = "H:" + ' '.join([line[2:].strip() for line in h_lines])
 
-    # Replace the first "H:" line with the merged line and remove all other "H:" lines
-    def replace_first_H(match):
-        replace_first_H.first_encountered = True
-        return merged_line
+        # Replace the first "H:" line with the merged line and remove all other "H:" lines
+        def replace_first_H(match):
+            replace_first_H.first_encountered = True
+            return merged_line
 
-    replace_first_H.first_encountered = False
-    content = re.sub(r'^H:.*$', lambda m: replace_first_H(m) if not replace_first_H.first_encountered else '', content, flags=re.MULTILINE)
+        replace_first_H.first_encountered = False
+        part = re.sub(r'^H:.*$', lambda m: replace_first_H(m) if not replace_first_H.first_encountered else '', part, flags=re.MULTILINE)
 
-    return content
+        return part
+
+    # Split the content into parts based on "NextPart", process each part and join them back together
+    parts = content.split('NextPart')
+    processed_parts = [process_part(part) for part in parts]
+    return 'NextPart'.join(processed_parts)
 
 
 def getInput0(f):
@@ -1123,8 +1130,8 @@ def getLY(score, headers=None):
                                 r"\once \override LyricText #'self-alignment-X = #CENTER ")
                     if is_hanzi:
                         needSpace = 1
-                    if c == "_":
-                        needSpace = 0  # TODO: document this: separate hanzi with _ to put more than one on same note
+                    if c == "-":
+                        needSpace = 0  # TODO: document this: separate hanzi with - to put more than one on same note
                     else:
                         l2.append(c)
                 line = u"".join(l2)
