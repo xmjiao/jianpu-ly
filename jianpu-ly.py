@@ -83,6 +83,8 @@ import re
 import shutil
 import argparse
 import requests
+import subprocess
+
 
 from fractions import Fraction as F  # requires Python 2.6+
 if type(u"") == type(""):  # Python 3
@@ -1752,10 +1754,26 @@ def set_output_file(args, input_text):
     if not args.output_file:
         title = get_title_from_text(input_text)
         if title:
+            args.title = title
             args.output_file = f'{title}.ly'  # Set output file name
         else:
+            args.title = 'song'
             args.output_file = 'song.ly'  # Default output file name
     return args
+
+
+def convert_midi_to_mp3(base_name):
+    # construct the command
+    command = f"timidity {base_name}.midi -Ow -o - | ffmpeg -i - -acodec libmp3lame -y {base_name}.mp3"
+
+    # execute the command
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+    output, error = process.communicate()
+
+    if error:
+        print(f"Error: {error}")
+    else:
+        print(f"Output: {output}")
 
 
 def main():
@@ -1781,7 +1799,7 @@ def main():
         out = filter_out_jianpu(out)
 
     write_output(out, args.output_file, args.input_file)
-
+    convert_midi_to_mp3(args.title)
 
 if __name__ == "__main__":
     main()
