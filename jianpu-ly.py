@@ -82,6 +82,7 @@ import os
 import re
 import shutil
 import argparse
+import requests
 
 from fractions import Fraction as F  # requires Python 2.6+
 if type(u"") == type(""):  # Python 3
@@ -867,18 +868,22 @@ def merge_lyrics(content):
     return 'NextPart'.join(processed_parts)
 
 
-def getInput0(f):
+def getInput0(f, is_google_drive=False):
     inDat = []
 
-    try:
+    # Check if we are reading from Google Drive or a local file
+    if is_google_drive:
+        inDat.append(merge_lyrics(f))
+    else:
         try:
-            # Python 3: try UTF-8 first
-            inDat.append(merge_lyrics(open(f, encoding="utf-8").read()))
-        except FileNotFoundError:
-            # Python 2, or Python 3 with locale-default encoding in case it's not UTF-8
-            inDat.append(merge_lyrics(open(f).read()))
-    except IOError:
-        errExit("Unable to read file "+f)
+            try:
+                # Python 3: try UTF-8 first
+                inDat.append(merge_lyrics(open(f, encoding="utf-8").read()))
+            except FileNotFoundError:
+                # Python 2, or Python 3 with locale-default encoding in case it's not UTF-8
+                inDat.append(merge_lyrics(open(f).read()))
+        except IOError:
+            errExit("Unable to read file "+f)
 
     if inDat:
         return inDat
@@ -889,7 +894,7 @@ def getInput0(f):
     # help text.
     if os.path.exists('/usr/bin/osascript'):
         f = os.popen(
-            "osascript -e $'tell application \"System Events\"\\nactivate\\nset f to choose file\\nend tell\\nPOSIX path of f'").read().rstrip()
+            "osascript -e $'tell application \"System Events\"\nactivate\nset f to choose file\nend tell\nPOSIX path of f'").read().rstrip()
         if f:
             try:
                 return [open(f, encoding="utf-8").read()]
@@ -899,8 +904,8 @@ def getInput0(f):
     raise SystemExit
 
 
-def get_input(infile):
-    inDat = getInput0(infile)
+def get_input(infile, is_google_drive=False):
+    inDat = getInput0(infile, is_google_drive)
 
     for i in xrange(len(inDat)):
         if inDat[i].startswith('\xef\xbb\xbf'):
@@ -1654,7 +1659,37 @@ def filter_out_jianpu(lilypond_text):
     return lilypond_text
 
 
-def main():
+# Function to download plain text file from Google Drive
+def download_file_from_google_drive(id):
+    """
+    This function downloads a Google Docs document as plain text using its file ID.
+
+    :param id: The ID of the file to download from Google Drive
+    :returns: The text content of the downloaded file
+    """
+
+    # Construct the URL for downloading the document as plain text
+    url = f"https://docs.google.com/document/export?format=txt&id={id}"
+
+    # Send a GET request to the constructed URL
+    response = requests.get(url)
+    response.raise_for_status()
+
+    # Decode the response content with UTF-8
+    text = response.content.decode('utf-8')
+
+    # Remove BOM if present
+    if text.startswith('\ufeff'):
+        text = text[len('\ufeff'):]
+
+    # Replace CRLF with LF
+    text = text.replace('\r\n', '\n')
+
+    # Return the processed text
+    return text
+
+
+def parse_arguments():
     # Create ArgumentParser object
     parser = argparse.ArgumentParser()
 
@@ -1667,27 +1702,43 @@ def main():
                         default=False, help="only output Staff sections")
     parser.add_argument('-o', '--with-staff', action='store_true',
                         default=False, help="output with Staff sections")
+    parser.add_argument('-g', '--google-drive', action='store_true',
+                        default=False, help="Use if the input_file is a Google Drive ID")
 
     # Add positional arguments
-    parser.add_argument('input_file', help="input file name")
+    parser.add_argument('input_file', help="input file name or Google Drive file ID (if -g is enabled)")
     parser.add_argument('output_file', nargs='?', default='',
                         help="output file name (optional)")
 
     # Parse options from command line
-    args = parser.parse_args()
+    return parser.parse_args()
+
+
+def main():
+    args = parse_arguments()
 
     if args.html or args.markdown:
         return write_docs()
 
-    inDat = get_input(args.input_file)
+    # Check whether to read file from google drive or local directory
+    if args.google_drive:
+        input_text = download_file_from_google_drive(args.input_file)
+        inDat = get_input(input_text, True)
+        if not args.output_file:
+            args.output_file = 'song.ly'
+    else:
+        inDat = get_input(args.input_file)
 
-    # <-- you can also call this if importing as a module
     out = process_input(inDat, args.staff_only or args.with_staff)
 
     if args.staff_only:
         out = filter_out_jianpu(out)
 
     write_output(out, args.output_file, args.input_file)
+
+
+if __name__ == "__main__":
+    main()
 
 
 if __name__ == "__main__":
