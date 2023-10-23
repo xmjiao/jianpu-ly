@@ -1714,7 +1714,54 @@ def parse_arguments():
     return parser.parse_args()
 
 
+def get_title_from_text(input_text):
+    """
+    Extracts the title from a string of text that contains a line with 'title='.
+
+    Args:
+        input_text (str): The input text to search for the title.
+
+    Returns:
+        str or None: The extracted title as a string, or None if no title is found.
+    """
+    # Find the line containing 'title=' and extract <title>
+    title_line = next((line for line in input_text.split('\n') if 'title=' in line), None)
+    if title_line:
+        title = title_line.split('=')[1].strip()  # Remove leading/trailing whitespaces
+        title = title.replace(' ', '_')  # Replace spaces with underscores
+        return title
+    return None   # Return None if no title is found
+
+
+def set_output_file(args, input_text):
+    """
+    Sets the output file name based on the input arguments and text.
+
+    If the output file name is not specified in the input arguments, the function
+    attempts to extract the title from the input text and use it as the output file
+    name. If a title cannot be extracted, the default output file name 'song.ly' is
+    used.
+
+    Args:
+        args: The input arguments.
+        input_text: The input text.
+
+    Returns:
+        The updated input arguments with the output file name set.
+    """
+    if not args.output_file:
+        title = get_title_from_text(input_text)
+        if title:
+            args.output_file = f'{title}.ly'  # Set output file name
+        else:
+            args.output_file = 'song.ly'  # Default output file name
+    return args
+
+
 def main():
+    """
+    Main function that processes input data and writes output to a file.
+    """
     args = parse_arguments()
 
     if args.html or args.markdown:
@@ -1724,8 +1771,7 @@ def main():
     if args.google_drive:
         input_text = download_file_from_google_drive(args.input_file)
         inDat = get_input(input_text, True)
-        if not args.output_file:
-            args.output_file = 'song.ly'
+        args = set_output_file(args, input_text)
     else:
         inDat = get_input(args.input_file)
 
@@ -1735,10 +1781,6 @@ def main():
         out = filter_out_jianpu(out)
 
     write_output(out, args.output_file, args.input_file)
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":
