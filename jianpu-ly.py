@@ -501,6 +501,7 @@ class NoteheadMarkup:
         # accidental is "", "#", "b"
         # tremolo is "" or ":32"
         # word,line is for error handling
+
         if len(figures) > 1:
             if accidental:
                 # see TODOs below
@@ -596,7 +597,7 @@ class NoteheadMarkup:
             if self.onePage and not midi:
                 ret += r"\noPageBreak "
             ret += "%{ bar "+str(self.barNo)+": %} "
-        if not octave in self.current_accidentals:
+        if octave not in self.current_accidentals:
             self.current_accidentals[octave] = [""]*7
         if nBeams == None:  # unspecified
             if self.keepLength:
@@ -1480,6 +1481,11 @@ def getLY(score, headers=None):
             r"\new RhythmicStaff \with {", r"\new RhythmicStaff \with { \override VerticalAxisGroup.default-staff-staff-spacing = #'((basic-distance . 6) (minimum-distance . 6) (stretchability . 0)) ")
     if not_angka:
         out = out.replace("make-bold-markup", "make-simple-markup")
+
+    # Fix the breaking up of long notes
+    pattern = r"([a-g]+[',]*)4\s*~\s*\(\s*([a-g]+[',]*)2\."
+    out = re.sub(pattern, lambda m: m.group(1) + "1 (" if m.group(1) == m.group(2) else m.group(0), out)
+
     return out, maxBeams, lyrics, headers
 
 
