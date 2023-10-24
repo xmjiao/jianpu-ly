@@ -200,9 +200,9 @@ def all_scores_start(inDat):
     if has_lyrics:
         r += r"""
   % Might need to enforce a minimum spacing between systems, especially if lyrics are below the last staff in a system and numbers are on the top of the next
-  system-system-spacing = #'((basic-distance . 7) (padding . 4) (stretchability . 1e7))
-  score-markup-spacing = #'((basic-distance . 9) (padding . 4) (stretchability . 1e7))
-  score-system-spacing = #'((basic-distance . 9) (padding . 4) (stretchability . 1e7))
+  system-system-spacing = #'((basic-distance . 7) (padding . 5) (stretchability . 1e7))
+  score-markup-spacing = #'((basic-distance . 9) (padding . 5) (stretchability . 1e7))
+  score-system-spacing = #'((basic-distance . 9) (padding . 5) (stretchability . 1e7))
   markup-system-spacing = #'((basic-distance . 2) (padding . 2) (stretchability . 0))
 """
     r += "}\n"  # end of \paper block
@@ -230,8 +230,13 @@ def score_end(**headers):
         # before the header block if it's per-score
         ret += r"\header{"+'\n'
         for k, v in headers.items():
-            ret += k+'="'+v+'"\n'
+            if '"' not in v:
+                v = '"' + v + '"'
+            if k == 'title' and '\\' not in v:
+                v = r'\markup{\fontsize #3 ' + v + '}'
+            ret += k + '=' + v + '\n'
         ret += "}\n"
+
     if midi:
         # will be overridden by any \tempo command used later
         ret += r'\midi { \context { \Score midiInstrument = "Flute" tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
@@ -1799,7 +1804,8 @@ def main():
         out = filter_out_jianpu(out)
 
     write_output(out, args.output_file, args.input_file)
-    convert_midi_to_mp3(args.title)
+    if args.google_drive:
+        convert_midi_to_mp3(args.title)
 
 if __name__ == "__main__":
     main()
