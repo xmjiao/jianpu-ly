@@ -94,6 +94,10 @@ else:
     from string import letters  # Python 2
 
 
+# Control options
+bar_number_every = 5
+
+
 def asUnicode(l):
     if type(l) == type(u""):
         return l
@@ -217,10 +221,6 @@ def score_start():
     if not notehead_markup.noBarNums and not midi:
         ret += ("\\override Score.BarNumber #'break-visibility = #center-visible\n\\override Score.BarNumber #'Y-offset = -1\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible %d)" % bar_number_every)
     return ret
-
-
-# TODO customise?  (anyway don't leave it numbering at start of system, doesn't work well in jianpu+lyrics)
-bar_number_every = 5
 
 
 def score_end(**headers):
@@ -1713,8 +1713,10 @@ def parse_arguments():
                         help="output in Markdown format")
     parser.add_argument('-s', '--staff-only', action='store_true',
                         default=False, help="only output Staff sections")
-    parser.add_argument('-o', '--with-staff', action='store_true',
-                        default=False, help="output with Staff sections")
+    parser.add_argument('-B', '--with-staff', action='store_true',
+                        default=False, help="output both Jianpu and Staff sections")
+    parser.add_argument('-b', '--bar-number-every', type=int, default=5,
+                        help="option to set bar number, default is 5")
     parser.add_argument('-g', '--google-drive', action='store_true',
                         default=False, help="Use if the input_file is a Google Drive ID")
 
@@ -1792,6 +1794,8 @@ def main():
     Main function that processes input data and writes output to a file.
     """
     args = parse_arguments()
+    global bar_number_every
+    bar_number_every = args.bar_number_every
 
     if args.html or args.markdown:
         return write_docs()
