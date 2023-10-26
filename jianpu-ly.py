@@ -1717,6 +1717,8 @@ def parse_arguments():
                         default=False, help="output both Jianpu and Staff sections")
     parser.add_argument('-b', '--bar-number-every', type=int, default=5,
                         help="option to set bar number, default is 5")
+    parser.add_argument('-M', '--metronome', action='store_true', default=False,
+                        help="Whether to enable metronome in the mp3 file")
     parser.add_argument('-g', '--google-drive', action='store_true',
                         default=False, help="Use if the input_file is a Google Drive ID")
 
@@ -1725,8 +1727,13 @@ def parse_arguments():
     parser.add_argument('output_file', nargs='?', default='',
                         help="output file name (optional)")
 
+    args = parser.parse_args()
+
+    global bar_number_every
+    bar_number_every = args.bar_number_every
+
     # Parse options from command line
-    return parser.parse_args()
+    return args
 
 
 def get_title_from_text(input_text):
@@ -1775,9 +1782,32 @@ def set_output_file(args, input_text):
     return args
 
 
-def convert_midi_to_mp3(base_name):
-    # construct the command
-    command = f"timidity {base_name}.midi -Ow -o - | lame - -b 192 {base_name}.mp3"
+def convert_midi_to_mp3(base_name, with_metronome):
+    """
+    Converts a MIDI file to an MP3 file using either 'mscore', 'musescore', or 'timidity' with 'lame'.
+    If 'with_metronome' is True, uses either 'mscore' or 'musescore' to include a metronome in the output.
+    Otherwise, uses 'timidity' with 'lame' to convert the MIDI file to MP3.
+
+    Args:
+        base_name (str): The base name of the MIDI file (without the '.midi' extension).
+        with_metronome (bool): Whether to include a metronome in the output.
+
+    Returns:
+        None
+    """
+
+    # Check if 'mscore' or 'musescore' exists
+    command = None
+
+    if with_metronome and shutil.which('mscore'):
+        # use mscore
+        command = f"mscore -o {base_name}.mp3 {base_name}.midi"
+    elif with_metronome and shutil.which('musescore'):
+        # use musescore
+        command = f"musescore -o {base_name}.mp3 {base_name}.midi"
+    else:
+        # fallback to timidity
+        command = f"timidity {base_name}.midi -Ow -o - | lame - -b 192 {base_name}.mp3"
 
     # execute the command
     process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
@@ -1794,8 +1824,6 @@ def main():
     Main function that processes input data and writes output to a file.
     """
     args = parse_arguments()
-    global bar_number_every
-    bar_number_every = args.bar_number_every
 
     if args.html or args.markdown:
         return write_docs()
@@ -1815,7 +1843,8 @@ def main():
 
     write_output(out, args.output_file, args.input_file)
     if args.google_drive:
-        convert_midi_to_mp3(args.title)
+        convert_midi_to_mp3(args.title, args.metronome)
+
 
 if __name__ == "__main__":
     main()
