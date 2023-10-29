@@ -96,6 +96,7 @@ else:
 
 # Control options
 bar_number_every = 5
+midiInstrument = 'choir aahs' # see  https://lilypond.org/doc/v2.24/Documentation/notation/midi-instruments
 
 
 def asUnicode(l):
@@ -239,7 +240,8 @@ def score_end(**headers):
 
     if midi:
         # will be overridden by any \tempo command used later
-        ret += r'\midi { \context { \Score midiInstrument = "Flute" tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
+        ret += r'\midi { \context { \Score midiInstrument = "' + midiInstrument \
+             + r'" tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
         # ret += r'\midi { \context { \Score tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
     elif notehead_markup.noBarNums:
         ret += r'\layout { \context { \Score \remove "Bar_number_engraver" } }'
@@ -1717,6 +1719,8 @@ def parse_arguments():
                         default=False, help="output both Jianpu and Staff sections")
     parser.add_argument('-b', '--bar-number-every', type=int, default=5,
                         help="option to set bar number, default is 5")
+    parser.add_argument('-i', '--instrument', action='store', default="",
+                        help="instrument to be used with MIDI")
     parser.add_argument('-M', '--metronome', action='store_true', default=False,
                         help="Whether to enable metronome in the mp3 file")
     parser.add_argument('-g', '--google-drive', action='store_true',
@@ -1729,8 +1733,16 @@ def parse_arguments():
 
     args = parser.parse_args()
 
-    global bar_number_every
+    global bar_number_every, midiInstrument
+
     bar_number_every = args.bar_number_every
+
+    if args.instrument:
+        midiInstrument = args.instrument
+    elif args.metronome:
+        midiInstrument = "choir aahs"
+    else:
+        midiInstrument = "flute"
 
     # Parse options from command line
     return args
