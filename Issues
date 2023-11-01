@@ -1,0 +1,6 @@
+1. Sometimes, there are mismatching closing parentheses before `\breathe`,
+   especially in staff notation, causing a warning message. Need to find
+   an easy way to reproduce it and then resolve it.
+2. Need to figure out how to put time signature (4/4) after the key signature.
+3. Figure out how to typeset \breathe as 'V' on top.
+4. For the automatically generated staff notation, merge the tied notes.
