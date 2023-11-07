@@ -179,9 +179,9 @@ def all_scores_start(inDat):
   % print-page-number = ##f
 
   % un-comment the next 3 lines for a binding edge:
-  % two-sided = ##t
-  % inner-margin = 20\mm
-  % outer-margin = 10\mm
+  two-sided = ##t
+  inner-margin = 25\mm
+  outer-margin = 25\mm
 
   % un-comment the next line for a more space-saving header layout:
   % scoreTitleMarkup = \markup { \center-column { \fill-line { \magnify #1.5 { \bold { \fromproperty #'header:dedication } } \magnify #1.5 { \bold { \fromproperty #'header:title } } \fromproperty #'header:composer } \fill-line { \fromproperty #'header:instrument \fromproperty #'header:subtitle \smaller{\fromproperty #'header:subsubtitle } } } }
@@ -244,10 +244,10 @@ def score_end(**headers):
              + r'" tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
         # ret += r'\midi { \context { \Score tempoWholesPerMinute = #(ly:make-moment 84 4)}}'
     elif notehead_markup.noBarNums:
-        ret += r'\layout { \context { \Score \remove "Bar_number_engraver" } }'
+        ret += r'\layout { indent = 0.0 \context { \Score \remove "Bar_number_engraver" } }'
     else:
         # ret += r"\layout{}"
-        ret += r"\layout { \context { \Score \override TimeSignature.break-visibility = #'#(#f #t #t) } }"
+        ret += r"\layout { indent = 0.0 \context { \Score \override TimeSignature.break-visibility = #'#(#f #t #t) } }"
     return ret + " }"
 
 
