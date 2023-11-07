@@ -220,7 +220,7 @@ def score_start():
         ret += "\\unfoldRepeats\n"
     ret += r"<< "
     if not notehead_markup.noBarNums and not midi:
-        ret += ("\\override Score.BarNumber #'break-visibility = #center-visible\n\\override Score.BarNumber #'Y-offset = -1\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible %d)" % bar_number_every)
+        ret += ("\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n\\override Score.BarNumber #'Y-offset = -1\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible %d)" % bar_number_every)
     return ret
 
 
@@ -1552,6 +1552,9 @@ def process_input(inDat, withStaff=False):
                         ret.append(score_end(**headers))
     ret = "".join(r+"\n" for r in ret)
     ret = re.sub(r'([\^_])"([^"]+)"', r'\1\2', ret)
+
+    # Add extra spcing before key signature
+    ret = ret.replace(r'\mark \markup{1=', r'\mark \markup{\hspace #5 1=')
     if lilypond_minor_version() >= 24:
         # needed to avoid deprecation warnings on Lilypond 2.24
         ret = re.sub(r"(\\override [A-Z][^ ]*) #'", r"\1.", ret)
