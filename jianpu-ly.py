@@ -278,12 +278,14 @@ def jianpu_voice_start(isTemp=0):
         stemLenFrac = str(0.4+0.2*max(0, maxBeams-1))
     else:
         r += r"""\override Stem #'direction = #DOWN
-    \override Tie #'staff-position = #2.5
-    \tupletUp"""+"\n"
+        \override Tie #'staff-position = #2.5
+        \override Beam.positions = #'(-1 . -1)
+        \tupletUp"""+"\n"
+
     r += (r"""
     \override Stem #'length-fraction = #%s
     \override Beam #'beam-thickness = #0.1
-    \override Beam #'length-fraction = #0.5
+    \override Beam #'length-fraction = #-0.5
     \override Voice.Rest #'style = #'neomensural %% this size tends to line up better (we'll override the appearance anyway)
     \override Accidental #'font-size = #-4
     \override TupletBracket #'bracket-visibility = ##t""" % stemLenFrac)
