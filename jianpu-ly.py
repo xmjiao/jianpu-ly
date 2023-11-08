@@ -85,7 +85,6 @@ import argparse
 import requests
 import subprocess
 
-
 from fractions import Fraction as F  # requires Python 2.6+
 if type(u"") == type(""):  # Python 3
     unichr, xrange = chr, range
@@ -179,9 +178,11 @@ def all_scores_start(inDat):
   % print-page-number = ##f
 
   % un-comment the next 3 lines for a binding edge:
-  two-sided = ##t
-  inner-margin = 25\mm
-  outer-margin = 25\mm
+  % two-sided = ##t
+  % inner-margin = 25\mm
+  % outer-margin = 25\mm
+  left-margin = 25\mm
+  right-margin = 25\mm
 
   % un-comment the next line for a more space-saving header layout:
   % scoreTitleMarkup = \markup { \center-column { \fill-line { \magnify #1.5 { \bold { \fromproperty #'header:dedication } } \magnify #1.5 { \bold { \fromproperty #'header:title } } \fromproperty #'header:composer } \fill-line { \fromproperty #'header:instrument \fromproperty #'header:subtitle \smaller{\fromproperty #'header:subsubtitle } } } }
@@ -205,9 +206,9 @@ def all_scores_start(inDat):
     if has_lyrics:
         r += r"""
   % Might need to enforce a minimum spacing between systems, especially if lyrics are below the last staff in a system and numbers are on the top of the next
-  system-system-spacing = #'((basic-distance . 7) (padding . 5) (stretchability . 1e7))
-  score-markup-spacing = #'((basic-distance . 9) (padding . 5) (stretchability . 1e7))
-  score-system-spacing = #'((basic-distance . 9) (padding . 5) (stretchability . 1e7))
+  system-system-spacing = #'((basic-distance . 7) (padding . 4) (stretchability . 1e7))
+  score-markup-spacing = #'((basic-distance . 9) (padding . 4) (stretchability . 1e7))
+  score-system-spacing = #'((basic-distance . 9) (padding . 4) (stretchability . 1e7))
   markup-system-spacing = #'((basic-distance . 2) (padding . 2) (stretchability . 0))
 """
     r += "}\n"  # end of \paper block
@@ -220,7 +221,7 @@ def score_start():
         ret += "\\unfoldRepeats\n"
     ret += r"<< "
     if not notehead_markup.noBarNums and not midi:
-        ret += ("\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n\\override Score.BarNumber #'Y-offset = -1\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible %d)" % bar_number_every)
+        ret += ("\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n\\override Score.BarNumber #'Y-offset = #1\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible %d)" % bar_number_every)
     return ret
 
 
@@ -1553,8 +1554,6 @@ def process_input(inDat, withStaff=False):
     ret = "".join(r+"\n" for r in ret)
     ret = re.sub(r'([\^_])"([^"]+)"', r'\1\2', ret)
 
-    # Add extra spcing before key signature
-    ret = ret.replace(r'\mark \markup{1=', r'\mark \markup{\hspace #5 1=')
     if lilypond_minor_version() >= 24:
         # needed to avoid deprecation warnings on Lilypond 2.24
         ret = re.sub(r"(\\override [A-Z][^ ]*) #'", r"\1.", ret)
@@ -1645,6 +1644,79 @@ For Unicode approximation on this system, please do one of these things:
                 os.chdir(cwd)
             return
     fix_utf8(sys.stdout, 'w').write(outDat)
+
+
+def reformat_key_time_signatures(s):
+    """
+    Reformat the key and time signatures within a given string representing musical notation.
+
+    The function performs the following operations:
+
+    1. Reformat key signatures found in the string:
+       It searches for key signature markup patterns such as "\\markup{1=A\\flat}" and
+       reformats them to "\markup{1=bA}", where 'A' represents any note and '\\flat'
+       is optional, indicating a flat note.
+
+    2. Extract the section of the string that contains Jianpu staff notation, which is
+       bounded by the markers "%% === BEGIN JIANPU STAFF ===" and "% === END JIANPU STAFF ===".
+
+    3. Within the extracted Jianpu staff notation section, it finds all unique time signatures
+       that match the pattern "\time X/Y", where X and Y are numerical values.
+
+    4. Sort the unique time signatures by their numerical values and format them as spaced strings
+       using the pattern "\hspace #1 \fraction X Y".
+
+    5. Dynamically compute horizontal spacing based on the number of time signatures found, and
+       reformat the key signature line in the original string to include the sorted time
+       signatures and dynamic spacing. If only one time signature is found, it includes the
+       command to omit the time signature from the staff.
+
+    Args:
+    - s (str): The input string containing the musical notation to be reformatted.
+
+    Returns:
+    - str: The reformatted string with updated key and time signatures.
+    """
+
+    # This pattern captures the key signature part including '1=' and any following \flat
+    key_signature_pattern = re.compile(r'\\markup\{\s*1=([A-G])(\\flat)?\}')
+
+    # Replace occurrences with the correct formatting.
+    def replace_key_signature(match):
+        note = match.group(1)
+        alteration = match.group(2)
+        alteration_symbol = 'b' if alteration == '\\flat' else ''
+        return f'\\markup{{1={alteration_symbol}{note}}}'
+
+    # Replace key signatures using the pattern
+    s = key_signature_pattern.sub(replace_key_signature, s)
+
+    # Extract section between "%% === BEGIN JIANPU STAFF ===" and "% === END JIANPU STAFF ==="
+    jianpu_staff_section_match = re.search(r'%% === BEGIN JIANPU STAFF ===(.*?)% === END JIANPU STAFF ===', s, re.DOTALL)
+
+    if jianpu_staff_section_match:
+        jianpu_staff_section = jianpu_staff_section_match.group(1)
+
+        # Find unique time signatures
+        time_signatures = set(re.findall(r'\\time\s+(\d+)/(\d+)', jianpu_staff_section))
+
+        # Sort time signatures from smallest to largest (by their numerical values)
+        time_signatures_sorted = sorted(time_signatures, key=lambda ts: (int(ts[0]), int(ts[1])))
+
+        # Convert sorted time signatures back to strings in the desired format
+        time_signatures_str = ' '.join([f'\\hspace #1 \\fraction {num} {denom}'
+                                        for num, denom in time_signatures_sorted])
+
+        # Compute the dynamic spacing based on the length of the time signatures
+        hspace_value = 11 + (len(time_signatures)-1) * 2
+
+        omittimesig = r'\\omit Staff.TimeSignature' if len(time_signatures) == 1 else ''
+
+        # Update key signature line in the original string
+        s = re.sub(r'(\\mark \\markup\{)1=(b?[A-G](\\sharp)?)\}',
+                   rf'\1\\hspace #{hspace_value} 1=\2 ' + time_signatures_str.replace('\\', '\\\\') + '}' + omittimesig, s, re.MULTILINE)
+
+    return s
 
 
 def filter_out_jianpu(lilypond_text):
@@ -1852,6 +1924,7 @@ def main():
         inDat = get_input(args.input_file)
 
     out = process_input(inDat, args.staff_only or args.with_staff)
+    out = reformat_key_time_signatures(out)
 
     if args.staff_only:
         out = filter_out_jianpu(out)
