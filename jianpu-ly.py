@@ -152,7 +152,7 @@ def lilypond_command():
                 return t
 
 
-def all_scores_start(inDat):
+def all_scores_start():
     staff_size = float(os.environ.get("j2ly_staff_size", 20))
     # Normal: j2ly_staff_size=20
     # Large: j2ly_staff_size=25.2
@@ -170,7 +170,6 @@ def all_scores_start(inDat):
 \paper {
   print-all-headers = ##t %% allow per-score headers
 
-  % un-comment the next line for A5:
   #(set-default-paper-size "letter" )
   #(set-paper-size "letter")
 
@@ -183,9 +182,6 @@ def all_scores_start(inDat):
   % outer-margin = 25\mm
   left-margin = 25\mm
   right-margin = 25\mm
-
-  % un-comment the next line for a more space-saving header layout:
-  % scoreTitleMarkup = \markup { \center-column { \fill-line { \magnify #1.5 { \bold { \fromproperty #'header:dedication } } \magnify #1.5 { \bold { \fromproperty #'header:title } } \fromproperty #'header:composer } \fill-line { \fromproperty #'header:instrument \fromproperty #'header:subtitle \smaller{\fromproperty #'header:subsubtitle } } } }
 """
     if os.path.exists("/Library/Fonts/Arial Unicode.ttf") and lilypond_minor_version() >= 20:
         r += r"""
@@ -205,14 +201,15 @@ def all_scores_start(inDat):
 """
     if has_lyrics:
         r += r"""
-  % Might need to enforce a minimum spacing between systems, especially if lyrics are below the last staff in a system and numbers are on the top of the next
+  % Might need to enforce a minimum spacing between systems, especially if lyrics are
+  % below the last staff in a system and numbers are on the top of the next
   system-system-spacing = #'((basic-distance . 7) (padding . 4) (stretchability . 1e7))
   score-markup-spacing = #'((basic-distance . 9) (padding . 4) (stretchability . 1e7))
   score-system-spacing = #'((basic-distance . 9) (padding . 4) (stretchability . 1e7))
   markup-system-spacing = #'((basic-distance . 2) (padding . 2) (stretchability . 0))
 """
     r += "}\n"  # end of \paper block
-    return r+"\n%{ The jianpu-ly input was:\n" + inDat.strip().replace("%}", "%/}")+"\n%}\n\n"
+    return r
 
 
 def score_start():
@@ -1022,8 +1019,6 @@ def graceNotes_markup(notes, isAfter):
     return r"^\tweak outside-staff-priority ##f ^\tweak avoid-slur #'inside ^\markup \%s { \line { %s } }" % (cmd, ' '.join(r))
 
 
-import re
-
 def grace_octave_fix(notes):
     """
     This function takes a string of notes in jianpu notation and applies the following fixes:
@@ -1094,7 +1089,91 @@ def gracenotes_western(notes):
     return ' '.join(r)
 
 
-def getLY(score, headers=None):
+def convert_ties_to_slurs(jianpu):
+    """
+    Convert tied notes in Jianpu notation to slurs.
+
+    Args:
+        jianpu (str): A string containing Jianpu notation with ties.
+
+    Returns:
+        str: The Jianpu notation with ties converted to slurs. Time signatures
+             following ties are handled properly, preserving their placement.
+    """
+    # Remove comments from the input
+    jianpu = re.sub(r'%.*$', '', jianpu, flags=re.MULTILINE).replace('|', '')
+
+    # Define the pattern to match the entire tied note sequence
+    tied_note_sequence_pattern = r'(?<!\\)\([^()]*~[^()]*\)(?<!\\)'
+
+    # Define the function to escape the first and last parenthesis of the matched sequence
+    def escape_slurs(match):
+        inner_content = match.group(0)
+        # Escape only the first opening and last closing parenthesis
+        inner_content = r'\(' + inner_content[1:-1] + r'\)'
+        return inner_content
+
+    jianpu = re.sub(tied_note_sequence_pattern, escape_slurs, jianpu)
+
+    # Pattern parts:
+    note_pattern = r"([qshb]?[1-7][',]*\.?)"  # Matches a note with optional modifier [qshb], digit 1-7, optional ' or ,, and optional dot.
+    annotation_pattern = r'(\s*[\^_]"[^"]*")*'  # Matches optional annotations with leading spaces.
+    dash_pattern = r'(\s+-)'  # Matches a space followed by a dash.
+    tie_pattern = r'(\s+~\s+)'  # Matches a tie symbol with spaces before and after.
+    dash_and_annotation_pattern = r'(' + dash_pattern + annotation_pattern + ')*'  # Combines dashes and annotations.
+    time_signature_pattern = r'(\s*\d+/\d+\s*)?'
+
+    # Full combined pattern for sequences of tied notes
+    combined_tie_pattern = (
+        note_pattern +
+        annotation_pattern +
+        dash_and_annotation_pattern +  # Use the combined dash and annotation pattern here
+        "(?:" +
+        tie_pattern +
+        time_signature_pattern +  # Include the time signature pattern here, optionally preceded by a newline
+        note_pattern +
+        annotation_pattern +
+        dash_and_annotation_pattern +  # And also here
+        ")+"
+    )
+
+    # This function will be used as the replacement function in the sub call
+    def slur_replacement(match):
+        # Get the full matched string, preserving newlines
+        matched_string = match.group(0)
+
+        # Replace newlines followed by a time signature to a special token to avoid splitting
+        matched_string = re.sub(r'(\n\s*\d+/\d+\s*)', r'__TIMESIG__\1', matched_string)
+
+        # Split the string into its parts using the tie symbol as the delimiter
+        parts = re.split(r'~\s*', matched_string)
+
+        # Replace the special token back to the original time signature
+        parts = [re.sub(r'__TIMESIG__', '', part) for part in parts]
+
+        # Remove trailing whitespace from each part, except for newlines
+        parts = [part.rstrip() for part in parts]
+
+        # Construct the slur by wrapping all but the first part in parentheses
+        slur_content = parts[0] + " ( " + " ".join(parts[1:]) + " )"
+
+        # Ensure we don't have multiple spaces in a row, but preserve newlines
+        slur_content = re.sub(r'[ \t\f\v]{2,}', ' ', slur_content)
+
+        # Move parenthesis before dashes
+        slur_content = re.sub(r'((?:\s+-)+)(\s+[\(\)])', r'\2\1', slur_content)
+
+        return slur_content
+
+    # Replace all instances of ties with slurs using the replacement function
+    converted_jianpu = re.sub(combined_tie_pattern, slur_replacement, jianpu)
+
+    return converted_jianpu.strip()
+
+
+def getLY(score, headers=None, midi=True):
+    if not midi:
+        score = convert_ties_to_slurs(score)
     if not headers:
         headers = {}  # Python 2 persists this dict if it's in the default args
     lyrics = []
@@ -1537,7 +1616,7 @@ def process_input(inDat, withStaff=False):
             not_angka = False  # may be set by getLY
             if scoreNo == 1 and not midi:
                 # now we've established non-empty
-                ret.append(all_scores_start(inDat))
+                ret.append(all_scores_start())
             # TODO: document this (results in 1st MIDI file containing all parts, then each MIDI file containing one part, if there's more than 1 part)
             separate_score_per_part = midi and re.search(
                 r"\sPartMidi\s", " "+score+" ") and len(parts) > 1
@@ -1546,7 +1625,8 @@ def process_input(inDat, withStaff=False):
                 for partNo, part in enumerate(parts):
                     if partNo == 0 or separate_scores:
                         ret.append(score_start())
-                    out, maxBeams, lyrics, headers = getLY(part, headers)
+                    out, maxBeams, lyrics, headers = getLY(part, headers, midi)
+
                     if notehead_markup.withStaff and notehead_markup.separateTimesig:
                         errExit(
                             "Use of both WithStaff and SeparateTimesig in the same piece is not yet implemented")
@@ -1814,8 +1894,6 @@ def parse_arguments():
                         default=False, help="only output Staff sections")
     parser.add_argument('-B', '--with-staff', action='store_true',
                         default=False, help="output both Jianpu and Staff sections")
-    parser.add_argument('-t', '--tie-to-slur', action='store_true',
-                        default=False, help="convert ties into slurs in Jianpu")
     parser.add_argument('-b', '--bar-number-every', type=int, default=1,
                         help="option to set bar number, default is 1")
     parser.add_argument('-i', '--instrument', action='store', default="",
@@ -1893,88 +1971,6 @@ def set_output_file(args, input_text):
     return args
 
 
-def convert_ties_to_slurs(jianpu):
-    """
-    Convert tied notes in Jianpu notation to slurs.
-
-    Args:
-        jianpu (str): A string containing Jianpu notation with ties.
-
-    Returns:
-        str: The Jianpu notation with ties converted to slurs. Time signatures
-             following ties are handled properly, preserving their placement.
-    """
-    # Remove comments from the input
-    jianpu = re.sub(r'%.*$', '', jianpu, flags=re.MULTILINE).replace('|', '')
-
-    # Define the pattern to match the entire tied note sequence
-    tied_note_sequence_pattern = r'(?<!\\)\([^()]*~[^()]*\)(?<!\\)'
-
-    # Define the function to escape the first and last parenthesis of the matched sequence
-    def escape_slurs(match):
-        inner_content = match.group(0)
-        # Escape only the first opening and last closing parenthesis
-        inner_content = r'\(' + inner_content[1:-1] + r'\)'
-        return inner_content
-
-    jianpu = re.sub(tied_note_sequence_pattern, escape_slurs, jianpu)
-
-    # Pattern parts:
-    note_pattern = r"([qshb]?[1-7][',]*\.?)"  # Matches a note with optional modifier [qshb], digit 1-7, optional ' or ,, and optional dot.
-    annotation_pattern = r'(\s*[\^_]"[^"]*")*'  # Matches optional annotations with leading spaces.
-    dash_pattern = r'(\s+-)'  # Matches a space followed by a dash.
-    tie_pattern = r'(\s+~\s+)'  # Matches a tie symbol with spaces before and after.
-    dash_and_annotation_pattern = r'(' + dash_pattern + annotation_pattern + ')*'  # Combines dashes and annotations.
-    time_signature_pattern = r'(\s*\d+/\d+\s*)?'
-
-    # Full combined pattern for sequences of tied notes
-    combined_tie_pattern = (
-        note_pattern +
-        annotation_pattern +
-        dash_and_annotation_pattern +  # Use the combined dash and annotation pattern here
-        "(?:" +
-        tie_pattern +
-        time_signature_pattern +  # Include the time signature pattern here, optionally preceded by a newline
-        note_pattern +
-        annotation_pattern +
-        dash_and_annotation_pattern +  # And also here
-        ")+"
-    )
-
-    # This function will be used as the replacement function in the sub call
-    def slur_replacement(match):
-        # Get the full matched string, preserving newlines
-        matched_string = match.group(0)
-
-        # Replace newlines followed by a time signature to a special token to avoid splitting
-        matched_string = re.sub(r'(\n\s*\d+/\d+\s*)', r'__TIMESIG__\1', matched_string)
-
-        # Split the string into its parts using the tie symbol as the delimiter
-        parts = re.split(r'~\s*', matched_string)
-
-        # Replace the special token back to the original time signature
-        parts = [re.sub(r'__TIMESIG__', '', part) for part in parts]
-
-        # Remove trailing whitespace from each part, except for newlines
-        parts = [part.rstrip() for part in parts]
-
-        # Construct the slur by wrapping all but the first part in parentheses
-        slur_content = parts[0] + " ( " + " ".join(parts[1:]) + " )"
-
-        # Ensure we don't have multiple spaces in a row, but preserve newlines
-        slur_content = re.sub(r'[ \t\f\v]{2,}', ' ', slur_content)
-
-        # Move parenthesis before dashes
-        slur_content = re.sub(r'((?:\s+-)+)(\s+[\(\)])', r'\2\1', slur_content)
-
-        return slur_content
-
-    # Replace all instances of ties with slurs using the replacement function
-    converted_jianpu = re.sub(combined_tie_pattern, slur_replacement, jianpu)
-
-    return converted_jianpu.strip()
-
-
 def convert_midi_to_mp3(base_name, with_metronome):
     """
     Converts a MIDI file to an MP3 file using either 'mscore', 'musescore', or 'timidity' with 'lame'.
@@ -2029,11 +2025,9 @@ def main():
     else:
         inDat = get_input(args.input_file)
 
-    if args.tie_to_slur:
-        inDat = convert_ties_to_slurs(inDat) # Convert ties to slurs
-
     out = process_input(inDat, args.staff_only or args.with_staff)
-    out = reformat_key_time_signatures(out)
+    if not args.staff_only and not args.with_staff:
+        out = reformat_key_time_signatures(out)
 
     if args.staff_only:
         out = filter_out_jianpu(out)
