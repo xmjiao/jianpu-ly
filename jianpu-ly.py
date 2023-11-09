@@ -94,7 +94,7 @@ else:
 
 
 # Control options
-bar_number_every = 5
+bar_number_every = 1
 midiInstrument = 'choir aahs' # see  https://lilypond.org/doc/v2.24/Documentation/notation/midi-instruments
 
 
@@ -282,13 +282,13 @@ def jianpu_voice_start(isTemp=0):
         \override Beam.positions = #'(-1 . -1)
         \tupletUp"""+"\n"
 
-    r += (r"""
-    \override Stem #'length-fraction = #%s
+    r += rf"""
+    \override Stem #'length-fraction = #{stemLenFrac}
     \override Beam #'beam-thickness = #0.1
     \override Beam #'length-fraction = #-0.5
     \override Voice.Rest #'style = #'neomensural %% this size tends to line up better (we'll override the appearance anyway)
     \override Accidental #'font-size = #-4
-    \override TupletBracket #'bracket-visibility = ##t""" % stemLenFrac)
+    \override TupletBracket #'bracket-visibility = ##t"""
     r += "\n" + \
         r"""\set Voice.chordChanges = ##t %% 2.19 bug workaround"""  # LilyPond 2.19.82: \applyOutput docs say "called for every layout object found in the context Context at the current time step" but 2.19.x breaks this by calling it for ALL contexts in the current time step, hence breaking our WithStaff by applying our jianpu numbers to the 5-line staff too.  Obvious workaround is to make our function check that the context it's called with matches our jianpu voice, but I'm not sure how to do this other than by setting a property that's not otherwise used, which we can test for in the function.  So I'm 'commandeering' the "chordChanges" property (there since at least 2.15 and used by Lilypond only when it's in chord mode, which we don't use, and if someone adds a chord-mode staff then it won't print noteheads anyway): we will substitute jianpu numbers for noteheads only if chordChanges = #t.
     return r+"\n", voiceName
@@ -918,6 +918,16 @@ def getInput0(f, is_google_drive=False):
 
 
 def get_input(infile, is_google_drive=False):
+    """
+    Reads input from a file and returns it as a string.
+
+    Args:
+        infile (str): The path to the input file.
+        is_google_drive (bool, optional): Whether the input file is stored in Google Drive. Defaults to False.
+
+    Returns:
+        str: The input data as a string.
+    """
     inDat = getInput0(infile, is_google_drive)
 
     for i in xrange(len(inDat)):
@@ -1495,6 +1505,16 @@ def getLY(score, headers=None):
 
 
 def process_input(inDat, withStaff=False):
+    """
+    Process the input data and return the corresponding LilyPond code.
+
+    Args:
+    - inDat: str - The input data to be processed.
+    - withStaff: bool - Whether to include staff notation in the output.
+
+    Returns:
+    - str - The LilyPond code corresponding to the input data.
+    """
     global unicode_mode
     unicode_mode = not not re.search(r"\sUnicode\s", " "+inDat+" ")
     if unicode_mode:
@@ -1794,8 +1814,10 @@ def parse_arguments():
                         default=False, help="only output Staff sections")
     parser.add_argument('-B', '--with-staff', action='store_true',
                         default=False, help="output both Jianpu and Staff sections")
-    parser.add_argument('-b', '--bar-number-every', type=int, default=5,
-                        help="option to set bar number, default is 5")
+    parser.add_argument('-t', '--tie-to-slur', action='store_true',
+                        default=False, help="convert ties into slurs in Jianpu")
+    parser.add_argument('-b', '--bar-number-every', type=int, default=1,
+                        help="option to set bar number, default is 1")
     parser.add_argument('-i', '--instrument', action='store', default="",
                         help="instrument to be used with MIDI")
     parser.add_argument('-M', '--metronome', action='store_true', default=False,
@@ -1871,6 +1893,88 @@ def set_output_file(args, input_text):
     return args
 
 
+def convert_ties_to_slurs(jianpu):
+    """
+    Convert tied notes in Jianpu notation to slurs.
+
+    Args:
+        jianpu (str): A string containing Jianpu notation with ties.
+
+    Returns:
+        str: The Jianpu notation with ties converted to slurs. Time signatures
+             following ties are handled properly, preserving their placement.
+    """
+    # Remove comments from the input
+    jianpu = re.sub(r'%.*$', '', jianpu, flags=re.MULTILINE).replace('|', '')
+
+    # Define the pattern to match the entire tied note sequence
+    tied_note_sequence_pattern = r'(?<!\\)\([^()]*~[^()]*\)(?<!\\)'
+
+    # Define the function to escape the first and last parenthesis of the matched sequence
+    def escape_slurs(match):
+        inner_content = match.group(0)
+        # Escape only the first opening and last closing parenthesis
+        inner_content = r'\(' + inner_content[1:-1] + r'\)'
+        return inner_content
+
+    jianpu = re.sub(tied_note_sequence_pattern, escape_slurs, jianpu)
+
+    # Pattern parts:
+    note_pattern = r"([qshb]?[1-7][',]*\.?)"  # Matches a note with optional modifier [qshb], digit 1-7, optional ' or ,, and optional dot.
+    annotation_pattern = r'(\s*[\^_]"[^"]*")*'  # Matches optional annotations with leading spaces.
+    dash_pattern = r'(\s+-)'  # Matches a space followed by a dash.
+    tie_pattern = r'(\s+~\s+)'  # Matches a tie symbol with spaces before and after.
+    dash_and_annotation_pattern = r'(' + dash_pattern + annotation_pattern + ')*'  # Combines dashes and annotations.
+    time_signature_pattern = r'(\s*\d+/\d+\s*)?'
+
+    # Full combined pattern for sequences of tied notes
+    combined_tie_pattern = (
+        note_pattern +
+        annotation_pattern +
+        dash_and_annotation_pattern +  # Use the combined dash and annotation pattern here
+        "(?:" +
+        tie_pattern +
+        time_signature_pattern +  # Include the time signature pattern here, optionally preceded by a newline
+        note_pattern +
+        annotation_pattern +
+        dash_and_annotation_pattern +  # And also here
+        ")+"
+    )
+
+    # This function will be used as the replacement function in the sub call
+    def slur_replacement(match):
+        # Get the full matched string, preserving newlines
+        matched_string = match.group(0)
+
+        # Replace newlines followed by a time signature to a special token to avoid splitting
+        matched_string = re.sub(r'(\n\s*\d+/\d+\s*)', r'__TIMESIG__\1', matched_string)
+
+        # Split the string into its parts using the tie symbol as the delimiter
+        parts = re.split(r'~\s*', matched_string)
+
+        # Replace the special token back to the original time signature
+        parts = [re.sub(r'__TIMESIG__', '', part) for part in parts]
+
+        # Remove trailing whitespace from each part, except for newlines
+        parts = [part.rstrip() for part in parts]
+
+        # Construct the slur by wrapping all but the first part in parentheses
+        slur_content = parts[0] + " ( " + " ".join(parts[1:]) + " )"
+
+        # Ensure we don't have multiple spaces in a row, but preserve newlines
+        slur_content = re.sub(r'[ \t\f\v]{2,}', ' ', slur_content)
+
+        # Move parenthesis before dashes
+        slur_content = re.sub(r'((?:\s+-)+)(\s+[\(\)])', r'\2\1', slur_content)
+
+        return slur_content
+
+    # Replace all instances of ties with slurs using the replacement function
+    converted_jianpu = re.sub(combined_tie_pattern, slur_replacement, jianpu)
+
+    return converted_jianpu.strip()
+
+
 def convert_midi_to_mp3(base_name, with_metronome):
     """
     Converts a MIDI file to an MP3 file using either 'mscore', 'musescore', or 'timidity' with 'lame'.
@@ -1924,6 +2028,9 @@ def main():
         args = set_output_file(args, input_text)
     else:
         inDat = get_input(args.input_file)
+
+    if args.tie_to_slur:
+        inDat = convert_ties_to_slurs(inDat) # Convert ties to slurs
 
     out = process_input(inDat, args.staff_only or args.with_staff)
     out = reformat_key_time_signatures(out)
