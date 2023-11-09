@@ -1106,17 +1106,14 @@ def convert_ties_to_slurs(jianpu):
     # Define the pattern to match the entire tied note sequence
     tied_note_sequence_pattern = r'(?<!\\)\([^()]*~[^()]*\)(?<!\\)'
 
-    # Define the function to escape the first and last parenthesis of the matched sequence
-    def escape_slurs(match):
-        inner_content = match.group(0)
-        # Escape only the first opening and last closing parenthesis
-        inner_content = r'\(' + inner_content[1:-1] + r'\)'
-        return inner_content
+    # protect ties within slurs
+    def protect_ties_in_slurs(match):
+        return match.group(0).replace('~', '__TIE__')
 
-    jianpu = re.sub(tied_note_sequence_pattern, escape_slurs, jianpu)
+    jianpu = re.sub(tied_note_sequence_pattern, protect_ties_in_slurs, jianpu)
 
     # Pattern parts:
-    note_pattern = r"([qshb]?[1-7][',]*\.?)"  # Matches a note with optional modifier [qshb], digit 1-7, optional ' or ,, and optional dot.
+    note_pattern = r"([qshb]?(?:[1-7][',]*)+\.?)"  # Matches a note with optional modifier [qshb], digit 1-7, optional ' or ,, and optional dot.
     annotation_pattern = r'(\s*[\^_]"[^"]*")*'  # Matches optional annotations with leading spaces.
     dash_pattern = r'(\s+-)'  # Matches a space followed by a dash.
     tie_pattern = r'(\s+~\s+)'  # Matches a tie symbol with spaces before and after.
@@ -1161,14 +1158,15 @@ def convert_ties_to_slurs(jianpu):
         slur_content = re.sub(r'[ \t\f\v]{2,}', ' ', slur_content)
 
         # Move parenthesis before dashes
-        slur_content = re.sub(r'((?:\s+-)+)(\s+[\(\)])', r'\2\1', slur_content)
+        slur_content = re.sub(r'((?:(?:\s+-)(?:\s+[\^_]"[^"]*")*' +
+                              r')+)(\s+[\(\)])', r'\2\1', slur_content)
 
         return slur_content
 
     # Replace all instances of ties with slurs using the replacement function
     converted_jianpu = re.sub(combined_tie_pattern, slur_replacement, jianpu)
 
-    return converted_jianpu.strip()
+    return converted_jianpu.strip().replace('__TIE__', '~')
 
 
 def getLY(score, headers=None, midi=True):
