@@ -1141,7 +1141,7 @@ def graceNotes_markup(notes, isAfter):
     else:
         cmd = "jianpu-grace"
     r = []
-    aftrNext = None
+    afternext = None
     thinspace = "\u2009"
     if not isinstance("", six.text_type):
         thinspace = thinspace.encode("utf-8")
@@ -1162,7 +1162,7 @@ def graceNotes_markup(notes, isAfter):
             r.append(
                 r"\override #'(direction . 1) \override #'(baseline-skip . 1.2) \dir-column { \line {"
             )
-            aftrNext = r"} \line { " + '"' + thinspace + above + '" } }'
+            afternext = r"} \line { " + '"' + thinspace + above + '" } }'
         elif n == ",":
             if i and notes[i - 1] == notes[i]:
                 continue
@@ -1171,7 +1171,7 @@ def graceNotes_markup(notes, isAfter):
             else:
                 below = "."
             r.append(r"\override #'(baseline-skip . 1.0) \center-column { \line { ")
-            aftrNext = (
+            afternext = (
                 r"} \line { \pad-to-box #'(0 . 0) #'(-0.2 . 0) " + '"' + below + '" } }'
             )
         else:
@@ -1179,9 +1179,9 @@ def graceNotes_markup(notes, isAfter):
                 r[-1] = r[-1][:-1] + n + '"'
             else:
                 r.append('"%s"' % n)
-            if aftrNext:
-                r.append(aftrNext)
-                aftrNext = None
+            if afternext:
+                r.append(afternext)
+                afternext = None
     return (
         r"^\tweak outside-staff-priority ##f ^\tweak avoid-slur #'inside ^\markup \%s { \line { %s } }"
         % (cmd, " ".join(r))
@@ -1570,14 +1570,14 @@ def process_note(
     out,
     notehead_markup,
     lastPtr,
-    aftrnext,
+    afternext,
     not_angka,
     need_final_barline,
     maxBeams,
     line,
 ):
     """
-    Process a note and return the updated values of lastPtr, aftrnext, need_final_barline, and maxBeams.
+    Process a note and return the updated values of lastPtr, afternext, need_final_barline, and maxBeams.
 
     This function takes a note (word) and various parameters regarding the notation and modifies the output list accordingly.
     It processes the note by applying octave changes, parsing the note, and applying any necessary markups. It also updates
@@ -1588,7 +1588,7 @@ def process_note(
     - out (list): the list of notes (output of processed notes)
     - notehead_markup (function): a function that returns the notehead markup
     - lastPtr (int): the index of the last note in the list
-    - aftrnext (str): the markup for the next note
+    - afternext (str): the markup for the next note
     - not_angka (bool): whether the note is a number or not (pertains to a specific notation system)
     - need_final_barline (bool): whether a final barline is needed at the end of the music piece
     - maxBeams (int): the maximum number of beams encountered so far in the piece
@@ -1596,7 +1596,7 @@ def process_note(
 
     Returns:
     - lastPtr (int): the updated index of the last note in the list
-    - aftrnext (str): the updated markup for the next note
+    - afternext (str): the updated markup for the next note
     - need_final_barline (bool): the updated value indicating if a final barline is needed
     - maxBeams (int): the updated maximum number of beams
     """
@@ -1612,7 +1612,7 @@ def process_note(
         )  # Remove octave changes from the note
         if not word:
             # If the word was only octave changes, no further processing is needed
-            return lastPtr, aftrnext, need_final_barline, maxBeams
+            return lastPtr, afternext, need_final_barline, maxBeams
 
     # Parse the note to separate its components (figures, beams, etc.)
     figures, nBeams, dots, octave, accidental, tremolo = parseNote(word, word0, line)
@@ -1638,11 +1638,11 @@ def process_note(
     out.append(this)  # Add the current note to the output
 
     # If there's any markup for the next note, handle accidental spacing and append it
-    if aftrnext:
+    if afternext:
         if need_space_for_accidental:
-            aftrnext = aftrnext.replace(r"\markup", r"\markup \halign #2 ", 1)
-        out.append(aftrnext)
-        aftrnext = None  # Reset the markup for the next note
+            afternext = afternext.replace(r"\markup", r"\markup \halign #2 ", 1)
+        out.append(afternext)
+        afternext = None  # Reset the markup for the next note
 
     # Update the maximum number of beams, accounting for octave if the notation is numerical
     if not_angka and "'" in octave:
@@ -1651,7 +1651,133 @@ def process_note(
         maxBeams = max(maxBeams, nBeams)
 
     # Return the updated values
-    return lastPtr, aftrnext, need_final_barline, maxBeams
+    return lastPtr, afternext, need_final_barline, maxBeams
+
+
+def process_grace_notes(
+    word, out, notehead_markup, midi, western, afternext, defined_jianpuGrace
+):
+    """
+    Process grace notes in the given word and append the corresponding notation to `out`.
+
+    Args:
+        word (str): The word containing the grace note to be processed.
+        out (list): The list to which the processed notation will be appended.
+        notehead_markup: The notehead markup object.
+        midi (bool): Whether to use MIDI notation.
+        western (bool): Whether to use Western notation.
+        afternext: The afternext object.
+        defined_jianpuGrace (bool): Whether the jianpu-grace markup definition has already been appended to `out`.
+
+    Returns:
+        Tuple[bool, Any]: A tuple containing the updated value of `defined_jianpuGrace` and `afternext`.
+    """
+    gracenote_content = word[2:-1]  # Extract the content between 'g[' and ']'
+
+    if midi or western:
+        # Append Western notation grace note
+        out.append(r"\acciaccatura { " + gracenotes_western(gracenote_content) + " }")
+    else:
+        # Handle the jianpu notation for grace note
+        afternext = graceNotes_markup(gracenote_content, 0)
+        if not notehead_markup.withStaff:
+            out.append(r"\once \textLengthOn ")
+        if not defined_jianpuGrace:
+            defined_jianpuGrace = True
+            # Append the necessary jianpu-grace markup definition to `out`
+            out.append(
+                r"""#(define-markup-command (jianpu-grace layout props text)
+(markup?) "Draw right-pointing jianpu grace under text."
+(let ((textWidth (cdr (ly:stencil-extent (interpret-markup layout props (markup (#:fontsize -4 text))) 0))))
+(interpret-markup layout props
+(markup
+  #:line
+  (#:right-align
+   (#:override
+    (cons (quote baseline-skip) 0.2)
+    (#:column
+     (#:line
+      (#:fontsize -4 text)
+      #:line
+      (#:pad-to-box
+       (cons -0.1 0)  ; X padding before grace
+       (cons -1.6 0)  ; affects height of grace
+       (#:path
+        0.1
+        (list (list (quote moveto) 0 0)
+              (list (quote lineto) textWidth 0)
+              (list (quote moveto) 0 -0.3)
+              (list (quote lineto) textWidth -0.3)
+              (list (quote moveto) (* textWidth 0.5) -0.3)
+              (list (quote curveto) (* textWidth 0.5) -1 (* textWidth 0.5) -1 textWidth -1)))))))))))) """
+            )
+    return defined_jianpuGrace, afternext
+
+
+def process_grace_notes_after(
+    word, out, lastPtr, notehead_markup, midi, western, defined_JGR
+):
+    """
+    Process the grace notes after the last note.
+
+    Args:
+    - word: str, the grace note content.
+    - out: list, the list of output strings.
+    - lastPtr: int, the index of the last note.
+    - notehead_markup: object, the notehead markup object.
+    - midi: bool, whether to use MIDI notation.
+    - western: bool, whether to use Western notation.
+    - defined_JGR: bool, whether the jianpu-grace-after markup command is defined.
+
+    Returns:
+    - defined_JGR: bool, whether the jianpu-grace-after markup command is defined.
+    """
+    gracenote_content = word[
+        1:-2
+    ]  # Remove the "[" and "]g" to isolate the grace note content
+    if midi or western:
+        # Handle grace notes for MIDI or Western notation:
+        out[lastPtr] = (
+            r" \afterGrace { "
+            + out[lastPtr]
+            + " } { "
+            + gracenotes_western(gracenote_content)
+            + " }"
+        )
+    else:
+        # Handle grace notes for Jianpu notation:
+        if not notehead_markup.withStaff:
+            out[lastPtr] = r"\once \textLengthOn " + out[lastPtr]
+        out.insert(lastPtr + 1, graceNotes_markup(gracenote_content, 1))
+        if not defined_JGR:
+            defined_JGR = True
+            out[lastPtr] = (
+                r"""#(define-markup-command (jianpu-grace-after layout props text)
+(markup?) "Draw left-pointing jianpu grace under text."
+(let ((textWidth (cdr (ly:stencil-extent (interpret-markup layout props (markup (#:fontsize -4 text))) 0))))
+(interpret-markup layout props
+(markup
+  #:line
+  (#:halign -4
+   (#:override
+    (cons (quote baseline-skip) 0.2)
+    (#:column
+     (#:line
+      (#:fontsize -4 text)
+      #:line
+      (#:pad-to-box (cons 0 0)
+       (cons -1.6 0)  ; affects height of grace
+      (#:path
+       0.1
+       (list (list (quote moveto) 0 0)
+             (list (quote lineto) textWidth 0)
+             (list (quote moveto) 0 -0.3)
+             (list (quote lineto) textWidth -0.3)
+             (list (quote moveto) (* textWidth 0.5) -0.3)
+             (list (quote curveto) (* textWidth 0.5) -1 (* textWidth 0.5) -1 0 -1)))))))))))) """
+                + out[lastPtr]
+            )
+    return defined_JGR
 
 
 def collapse_tied_notes(out):
@@ -1674,10 +1800,10 @@ def collapse_tied_notes(out):
     # Patterns for converting sequences of tied notes into longer notes
     note_patterns = [
         (4, r"\.", "1."),  # in 12/8, 4 dotted crotchets = dotted semibreve
-        (4, "", "1"),      # 4 crotchets = semibreve
-        (3, "", "2."),     # 3 crotchets = dotted minim
+        (4, "", "1"),  # 4 crotchets = semibreve
+        (3, "", "2."),  # 3 crotchets = dotted minim
         (2, r"\.", "2."),  # in 6/8, 2 dotted crotchets = dotted minim
-        (2, "", "2"),      # 2 crotchets = minim
+        (2, "", "2"),  # 2 crotchets = minim
     ]
 
     # Use regular expressions to match tied note patterns and
@@ -1721,9 +1847,9 @@ def collapse_tied_notes(out):
     # Adjust staff spacing for consistent look across the entire score.
     out = out.replace(
         r"\new RhythmicStaff \with {",
-        r"\new RhythmicStaff \with {" +
-        r"\override VerticalAxisGroup.default-staff-staff-spacing = " +
-        r"#'((basic-distance . 6) (minimum-distance . 6) (stretchability . 0)) ",
+        r"\new RhythmicStaff \with {"
+        + r"\override VerticalAxisGroup.default-staff-staff-spacing = "
+        + r"#'((basic-distance . 6) (minimum-distance . 6) (stretchability . 0)) ",
     )
 
     return out
@@ -1805,26 +1931,44 @@ def finalize_output(out_list, need_final_barline, midi, western, not_angka):
 
 
 def getLY(score, headers=None, midi=True):
+    """
+    Transforms a given score into LilyPond format.
+
+    Args:
+        score (str): The raw input string containing musical notation.
+        headers (dict): A dictionary with LilyPond header information, defaults to None.
+        midi (bool): A Boolean flag indicating whether MIDI output is desired, defaults to True.
+
+    Returns:
+        tuple: A 4-tuple containing the generated output in LilyPond format,
+               the maximum number of beams found, a list of processed lyrics,
+               and the dictionary of headers.
+    """
+
+    # Convert ties to slurs if MIDI output is not being generated
     if not midi:
         score = convert_ties_to_slurs(score)
+
+    # Use an empty dictionary for headers if not provided to avoid mutable default argument
     if not headers:
-        headers = {}  # Python 2 persists this dict if it's in the default args
-    lyrics = []
-    notehead_markup.initOneScore()
-    out = []
-    maxBeams = 0
-    need_final_barline = False
-    repeatStack = []
-    lastPtr = 0
-    escaping = inTranspose = 0
-    aftrnext = defined_jianpuGrace = defined_JGR = None
+        headers = {}
+
+    lyrics = []  # Initialize list to store processed lyrics
+    notehead_markup.initOneScore()  # Initialize notation specifics for one score
+    out = []  # Output list to accumulate LilyPond code
+    maxBeams = 0  # Variable to track the maximum number of beams
+    need_final_barline = False  # Flag to determine if a final barline is needed
+    repeatStack = []  # Stack to handle repeat barlines
+    lastPtr = 0  # Position tracker for handling elements added to `out`
+    escaping = inTranspose = 0  # Flags for escaping LilyPond blocks and transposing
+    afternext = defined_jianpuGrace = defined_JGR = None  # Initialize state flags
+
     for line in score.split("\n"):
         line = fix_fullwidth(line).strip()
-        # to provide an upgrade path for jihuan-tian's fork
+        # Upgrade path compatibility for tempo
         line = re.sub(r"^%%\s*tempo:\s*(\S+)\s*$", r"\1", line)
         if line.startswith("LP:"):
-            # Escaped LilyPond block.  Thanks to James Harkins for this suggestion.
-            # (Our internal barcheck does not understand code in LP blocks, so keep it to complete bars.)
+            # Escaped LilyPond block.
             escaping = 1
             if len(line) > 3:
                 out.append(line[3:] + "\n")  # remainder of current line
@@ -1969,83 +2113,19 @@ def getLY(score, headers=None, midi=True):
                     out.append("}")
                     notehead_markup.tuplet = (1, 1)
                 elif re.match(r"g\[[#b',1-9\s]+\]$", word):
-                    if midi or western:
-                        out.append(
-                            r"\acciaccatura { " + gracenotes_western(word[2:-1]) + " }"
-                        )
-                    else:
-                        aftrnext = graceNotes_markup(word[2:-1], 0)
-                        if not notehead_markup.withStaff:
-                            out.append(r"\once \textLengthOn ")
-                        if not defined_jianpuGrace:
-                            defined_jianpuGrace = True
-                            out.append(
-                                r"""#(define-markup-command (jianpu-grace layout props text)
-(markup?) "Draw right-pointing jianpu grace under text."
-(let ((textWidth (cdr (ly:stencil-extent (interpret-markup layout props (markup (#:fontsize -4 text))) 0))))
-(interpret-markup layout props
-(markup
-  #:line
-  (#:right-align
-   (#:override
-    (cons (quote baseline-skip) 0.2)
-    (#:column
-     (#:line
-      (#:fontsize -4 text)
-      #:line
-      (#:pad-to-box
-       (cons -0.1 0)  ; X padding before grace
-       (cons -1.6 0)  ; affects height of grace
-       (#:path
-        0.1
-        (list (list (quote moveto) 0 0)
-              (list (quote lineto) textWidth 0)
-              (list (quote moveto) 0 -0.3)
-              (list (quote lineto) textWidth -0.3)
-              (list (quote moveto) (* textWidth 0.5) -0.3)
-              (list (quote curveto) (* textWidth 0.5) -1 (* textWidth 0.5) -1 textWidth -1)))))))))))) """
-                            )
+                    defined_jianpuGrace, afternext = process_grace_notes(
+                        word,
+                        out,
+                        notehead_markup,
+                        midi,
+                        western,
+                        afternext,
+                        defined_jianpuGrace,
+                    )
                 elif re.match(r"\[[#b',1-9]+\]g$", word):
-                    if midi or western:
-                        out[lastPtr] = (
-                            r" \afterGrace { "
-                            + out[lastPtr]
-                            + " } { "
-                            + gracenotes_western(word[1:-2])
-                            + " }"
-                        )
-                    else:
-                        if not notehead_markup.withStaff:
-                            out[lastPtr] = r"\once \textLengthOn " + out[lastPtr]
-                        out.insert(lastPtr + 1, graceNotes_markup(word[1:-2], 1))
-                        if not defined_JGR:
-                            defined_JGR = True
-                            out[lastPtr] = (
-                                r"""#(define-markup-command (jianpu-grace-after layout props text)
-(markup?) "Draw left-pointing jianpu grace under text."
-(let ((textWidth (cdr (ly:stencil-extent (interpret-markup layout props (markup (#:fontsize -4 text))) 0))))
-(interpret-markup layout props
-(markup
-  #:line
-  (#:halign -4
-   (#:override
-    (cons (quote baseline-skip) 0.2)
-    (#:column
-     (#:line
-      (#:fontsize -4 text)
-      #:line
-      (#:pad-to-box (cons 0 0)
-       (cons -1.6 0)  ; affects height of grace
-      (#:path
-       0.1
-       (list (list (quote moveto) 0 0)
-             (list (quote lineto) textWidth 0)
-             (list (quote moveto) 0 -0.3)
-             (list (quote lineto) textWidth -0.3)
-             (list (quote moveto) (* textWidth 0.5) -0.3)
-             (list (quote curveto) (* textWidth 0.5) -1 (* textWidth 0.5) -1 0 -1)))))))))))) """
-                                + out[lastPtr]
-                            )
+                    defined_JGR = process_grace_notes_after(
+                        word, out, lastPtr, notehead_markup, midi, western, defined_JGR
+                    )
                 elif word == "Fine":
                     need_final_barline = False
                     out.append(
@@ -2057,18 +2137,19 @@ def getLY(score, headers=None, midi=True):
                         r'''\once \override Score.RehearsalMark #'break-visibility = #begin-of-line-invisible \once \override Score.RehearsalMark #'self-alignment-X = #RIGHT \mark "D.C. al Fine" \bar "||"'''
                     )
                 else:  # note (or unrecognised)
-                    lastPtr, aftrnext, need_final_barline, maxBeams = process_note(
+                    lastPtr, afternext, need_final_barline, maxBeams = process_note(
                         word,
                         out,
                         notehead_markup,
                         lastPtr,
-                        aftrnext,
+                        afternext,
                         not_angka,
                         need_final_barline,
                         maxBeams,
                         line,
                     )
 
+    # Final checks and finalizations
     if notehead_markup.barPos == 0 and notehead_markup.barNo == 1:
         errExit("No jianpu in score %d" % scoreNo)
     if (
@@ -2086,7 +2167,7 @@ def getLY(score, headers=None, midi=True):
         errExit("Unterminated LP: in score %d" % scoreNo)
     notehead_markup.endScore()  # perform checks
 
-    # Finalize the output
+    # Finalize the output by performing additional cleanup
     out = finalize_output(out, need_final_barline, midi, western, not_angka)
 
     return out, maxBeams, lyrics, headers
