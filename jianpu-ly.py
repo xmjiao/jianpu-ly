@@ -84,9 +84,10 @@ import shutil
 import argparse
 import requests
 import subprocess
+import six
 
 from fractions import Fraction as F  # requires Python 2.6+
-if type(u"") == type(""):  # Python 3
+if isinstance("", six.text_type):  # Python 3
     unichr, xrange = chr, range
     from string import ascii_letters as letters
 else:
@@ -99,7 +100,7 @@ midiInstrument = 'choir aahs' # see  https://lilypond.org/doc/v2.24/Documentatio
 
 
 def asUnicode(l):
-    if type(l) == type(u""):
+    if isinstance(l, six.text_type):
         return l
     return l.decode('utf-8')
 
@@ -564,7 +565,7 @@ class NoteheadMarkup:
                     figuresNew = "."
                 else:
                     figuresNew = u"\u2013"
-                    if not type(u"") == type(""):
+                    if not isinstance("", six.text_type):
                         figuresNew = figuresNew.encode('utf-8')
             else:
                 figuresNew = figures
@@ -582,7 +583,7 @@ class NoteheadMarkup:
             elif not_angka and accidental:  # not chord
                 # TODO: the \ looks better than the / in default font
                 u338, u20e5 = u"\u0338", u"\u20e5"
-                if not type("") == type(u""):
+                if not isinstance("", six.text_type):
                     u338, u20e5 = u338.encode('utf-8'), u20e5.encode('utf-8')
                 ret += '(make-lower-markup 0.5 (make-bold-markup "%s%s")))))))\n' % (
                     figures[:1], {'#': u338, 'b': u20e5}[accidental])
@@ -772,7 +773,7 @@ def parseNote(word, origWord, line):
         # (for not angka, TODO: document that this is now acceptable as an input word?)
         word = "-"
     word = word.replace("8", "1'").replace("9", "2'")
-    if type(u"") == type(""):
+    if isinstance("", six.text_type):
         word = word.replace(u"\u2019", "'")
     else:
         word = word.replace(u"\u2019".encode('utf-8'), "'")
@@ -938,7 +939,7 @@ def get_input(infile, is_google_drive=False):
 
 
 def fix_utf8(stream, mode):
-    if type("") == type(u""):  # Python 3: please use UTF-8 for Lilypond, even if the system locale says something else
+    if isinstance("", six.text_type):  # Python 3: please use UTF-8 for Lilypond, even if the system locale says something else
         import codecs
         if mode == 'r':
             return codecs.getreader("utf-8")(stream.buffer)
@@ -949,7 +950,7 @@ def fix_utf8(stream, mode):
 
 
 def fix_fullwidth(t):
-    if type(u"") == type(""):
+    if isinstance("", six.text_type):
         utext = t
     else:
         utext = t.decode('utf-8')
@@ -964,7 +965,7 @@ def fix_fullwidth(t):
         else:
             r.append(c)
     utext = u"".join(r)
-    if type(u"") == type(""):
+    if isinstance("", six.text_type):
         return utext
     else:
         return utext.encode('utf-8')
@@ -978,7 +979,7 @@ def graceNotes_markup(notes, isAfter):
     r = []
     aftrNext = None
     thinspace = u'\u2009'
-    if not type("") == type(u""):
+    if not isinstance("", six.text_type):
         thinspace = thinspace.encode('utf-8')
     notes = grace_octave_fix(notes)
     for i in xrange(len(notes)):
@@ -1169,6 +1170,132 @@ def convert_ties_to_slurs(jianpu):
     return converted_jianpu.strip().replace('__TIE__', '~')
 
 
+def process_lyrics_line(line, do_hanzi_spacing):
+    """
+    Process a line of lyrics, including handling verse numbers and Chinese character spacing.
+
+    Args:
+    line (str): The line of lyrics to be processed.
+    do_hanzi_spacing (bool): Whether to handle Chinese character spacing.
+
+    Returns:
+    str: The processed lyrics line.
+    """
+    toAdd = ""
+    if line and '1' <= line[0] <= '9' and (line[1] == '.' or asUnicode(line)[1] == u"\uff0e"):
+        # a verse number
+        toAdd = r'\set stanza = #"%s." ' % line[:1]
+        if line[1] == '.':
+            line = line[2:]
+        elif not isinstance(line, six.text_type):
+            line = line[4:]  # for utf-8 full-width dot in Python 2
+        else:
+            line = line[2:]  # for full-width dot in Python 3
+        line = line.strip()
+
+    if do_hanzi_spacing:
+        # Handle Chinese characters (hanzi) and related spacing:
+        # for overhanging commas etc to work
+        l2 = [r"\override LyricText #'self-alignment-X = #LEFT "]
+        if toAdd:
+            l2.append(toAdd)
+            toAdd = ""
+        needSpace = 0
+        for c in list(asUnicode(line)):
+            # TODO: also cover those outside the BMP?  but beware narrow Python builds
+            is_hanzi = (0x3400 <= ord(c) < 0xa700)
+            is_openquote = c in u"\u2018\u201c\u300A"
+            if needSpace and (is_hanzi or is_openquote):
+                l2.append(' ')
+                needSpace = 0
+                if is_openquote:  # hang left
+                    # or RIGHT if there's no punctuation after
+                    l2.append(
+                        r"\once \override LyricText #'self-alignment-X = #CENTER ")
+            if is_hanzi:
+                needSpace = 1
+            if c == "-":
+                needSpace = 0  # TODO: document this: separate hanzi with - to put more than one on same note
+            else:
+                l2.append(c)
+        line = u"".join(l2)
+        if not isinstance("", six.text_type):
+            line = line.encode('utf-8')  # Python 2
+
+    # Replace certain characters and encode as needed, and
+    # prepare the lyrics line with or without verse numbers.
+    processed_lyrics = toAdd + re.sub("(?<=[^- ])- ", " -- ", line).replace(" -- ", " --\n")
+    return processed_lyrics
+
+
+def process_headers_line(line, headers):
+    """
+    Process a single line of headers in a Jianpu file.
+
+    Args:
+        line (str): A single line of headers in the format "header_name=header_value".
+        headers (dict): A dictionary containing the current headers in the Jianpu file.
+
+    Raises:
+        ValueError: If the header value does not match the expected value.
+
+    Returns:
+        None
+    """
+    hName, hValue = line.split("=", 1)
+    hName, hValue = hName.strip().lower(), hValue.strip()
+    if not headers.get(hName, hValue) == hValue:
+        if hName == 'instrument':
+            missing = 'NextPart or NextScore'
+        else:
+            missing = 'NextScore'
+        errExit(f"Changing header '{hName}' from '{headers[hName]}' to '{hValue}' (is there a missing {missing}?)")
+    headers[hName] = hValue
+
+
+def process_key_signature(word, out, midi, western, inTranspose, notehead_markup):
+    """
+    Process a key signature in LilyPond syntax and add it to the output.
+
+    Args:
+        word (str): The key signature in LilyPond syntax.
+        out (list): The list to which LilyPond code should be appended.
+        midi (bool): Whether the output is for MIDI.
+        western (bool): Whether the output is for Western notation.
+        inTranspose (int): The current transpose state.
+        notehead_markup (NoteheadMarkup): The notehead markup object.
+
+    Returns:
+        int: The updated transpose state.
+    """
+
+    # Convert '#' and 'b' to Unicode for approximation display
+    unicode_repr = re.sub('(?<!=)b$', u'\u266d', word.replace('#', u'\u266f')).upper() + ' '
+    notehead_markup.unicode_approx.append(unicode_repr)
+
+    if midi or western:
+        # Close any open transposition block
+        if inTranspose:
+            out.append('}')
+
+        transposeTo = word.split('=')[1].replace("#", "is").replace("b", "es").lower()
+
+        # Ensure correct octave for MIDI pitch
+        if midi and transposeTo[0] in "gab":
+            transposeTo += ','
+
+        # Transpose command for key
+        out.append(r"\transpose c " + transposeTo + r" { \key c \major ")
+
+        inTranspose = 1
+    else:
+        # Non-transposing key change marker for display
+        out.append(r'\mark \markup{%s}' % word.replace("b", r"\flat").replace("#", r"\sharp"))
+
+    # Return the updated transpose state
+    return inTranspose
+
+
 def getLY(score, headers=None, midi=True):
     if not midi:
         score = convert_ties_to_slurs(score)
@@ -1204,58 +1331,11 @@ def getLY(score, headers=None, midi=True):
             # lyrics
             do_hanzi_spacing = line.startswith("H:")
             line = line[2:].strip()
-            toAdd = ""
-            if line and '1' <= line[0] <= '9' and (line[1] == '.' or asUnicode(line)[1] == u"\uff0e"):
-                # a verse number
-                toAdd = r'\set stanza = #"%s." ' % line[:1]
-                if line[1] == '.':
-                    line = line[2:]
-                elif not type(line) == type(u""):
-                    line = line[4:]  # for utf-8 full-width dot in Python 2
-                else:
-                    line = line[2:]  # for full-width dot in Python 3
-                line = line.strip()
-            if do_hanzi_spacing:  # this is not 100% perfect...
-                # for overhanging commas etc to work
-                l2 = [r"\override LyricText #'self-alignment-X = #LEFT "]
-                if toAdd:
-                    l2.append(toAdd)
-                    toAdd = ""
-                needSpace = 0
-                for c in list(asUnicode(line)):
-                    # TODO: also cover those outside the BMP?  but beware narrow Python builds
-                    is_hanzi = (0x3400 <= ord(c) < 0xa700)
-                    is_openquote = c in u"\u2018\u201c\u300A"
-                    if needSpace and (is_hanzi or is_openquote):
-                        l2.append(' ')
-                        needSpace = 0
-                        if is_openquote:  # hang left
-                            # or RIGHT if there's no punctuation after
-                            l2.append(
-                                r"\once \override LyricText #'self-alignment-X = #CENTER ")
-                    if is_hanzi:
-                        needSpace = 1
-                    if c == "-":
-                        needSpace = 0  # TODO: document this: separate hanzi with - to put more than one on same note
-                    else:
-                        l2.append(c)
-                line = u"".join(l2)
-                if not type("") == type(u""):
-                    line = line.encode('utf-8')  # Python 2
-            lyrics.append(
-                toAdd+re.sub("(?<=[^- ])- ", " -- ", line).replace(" -- ", " --\n"))
+            processed_lyrics = process_lyrics_line(line, do_hanzi_spacing)
+            lyrics.append(processed_lyrics)
         elif re.match(r"\s*[A-Za-z]+\s*=", line):
             # Lilypond header
-            hName, hValue = line.split("=", 1)
-            hName, hValue = hName.strip().lower(), hValue.strip()
-            if not headers.get(hName, hValue) == hValue:
-                if hName == 'instrument':
-                    missing = 'NextPart or NextScore'
-                else:
-                    missing = 'NextScore'
-                errExit("Changing header '%s' from '%s' to '%s' (is there a missing %s?)" % (
-                    hName, headers[hName], hValue, missing))
-            headers[hName] = hValue
+            process_headers_line(line, headers)
         else:
             line = re.sub('(?<= )[_^]"[^" ]* [^"]*"(?= |$)', lambda m: m.group().replace(
                 ' ', chr(0)), " "+line)[1:]  # multi-word text above/below stave
@@ -1268,29 +1348,7 @@ def getLY(score, headers=None, midi=True):
                 elif re.match("[1-468]+[.]*=[1-9][0-9]*$", word):
                     out.append(r'\tempo '+word)  # TODO: reduce size a little?
                 elif re.match("[16]=[A-Ga-g][#b]?$", word):  # key
-                    # Must use \transpose because \transposition doesn't always work.
-                    # However, don't use \transpose if printing - it adds extra accidentals to the rhythm staff.
-                    # So we have to do separate runs of \layout and \midi (hence the outer loop).
-                    notehead_markup.unicode_approx.append(
-                        u''+re.sub('(?<!=)b$', u'\u266d', word.replace('#', u'\u266f')).upper()+u' ')
-                    if midi or western:
-                        if inTranspose:
-                            out.append('}')
-                        if word[0] == "6":
-                            transposeFrom = "a"
-                        else:
-                            transposeFrom = "c"
-                        transposeTo = word[word.index(
-                            '=')+1:].replace("#", "is").replace("b", "es").lower()
-                        if midi and transposeTo[0] in "gab":
-                            transposeTo += ','
-                        # so that MIDI or Western pitches are correct
-                        out.append(r"\transpose c "+transposeTo +
-                                   r" { \key c \major ")
-                        inTranspose = 1
-                    else:
-                        out.append(r'\mark \markup{%s}' % word.replace(
-                            "b", r"\flat").replace("#", r"\sharp"))
+                    inTranspose = process_key_signature(word, out, midi, western, inTranspose, notehead_markup)
                 elif word.startswith("Fr="):
                     finger = word.split("=")[1]
                     finger = {
@@ -1305,7 +1363,7 @@ def getLY(score, headers=None, midi=True):
                         # full-width tilde.  Could also use U+1D008 "Byzantine musical symbol syrmatiki" but that (a) won't display on macOS (as of 12.6) and (b) needs special consideration for old versions of Python 2 on narrow Unicode builds
                         "tilde": u"\u223c",
                     }.get(finger, finger)
-                    if not type("") == type(u""):
+                    if not isinstance("", six.text_type):
                         finger = finger.encode('utf-8')  # Python 2
                     out.append(r'\finger "%s"' % finger)
                 elif re.match("letter[A-Z]$", word):
@@ -1534,7 +1592,7 @@ def getLY(score, headers=None, midi=True):
         while i < len(out)-1 and out[i].startswith(r'\mark \markup{') and out[i].endswith('}') and out[i+1].startswith(r'\mark \markup{') and out[i+1].endswith('}'):
             # merge time/key signatures
             nbsp = u'\u00a0'
-            if not type(u"") == type(""):  # Python 2
+            if not isinstance("", six.text_type):  # Python 2
                 nbsp = nbsp.encode('utf-8')
             out[i] = out[i][:-1]+nbsp+' '+out[i+1][len(r'\mark \markup{'):]
             del out[i+1]
