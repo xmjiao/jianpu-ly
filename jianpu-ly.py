@@ -1,7 +1,15 @@
 #!/usr/bin/env python
 
-# Jianpu (numbered musical notation) for Lilypond
-# v1.731 (c) 2012-2023 Silas S. Brown
+# jp2ly: Jianpu to LilyPond Converter with Jianpu and/or Staff Notation Output
+# v0.1 (c) 2023 Xiangmin Jiao <xmjiao@gmail.com>
+
+# Forked and expanded from 'Jianpu (numbered musical notation) for Lilypond'
+# originally created by Silas S. Brown, v1.731 (c) 2012-2023 Silas S. Brown.
+
+# jp2ly extends the original work by enabling the generation of both Jianpu and
+# standard Western staff notations, with more standard handling of ties and
+# slurs in Jianpu. The core functionality has been refactored to enhance
+# readability and expand capabilities.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,12 +23,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Homepage: http://ssb22.user.srcf.net/mwrhome/jianpu-ly.py
-# Git repository: https://github.com/ssb22/jianpu-ly
-# and on GitLab: https://gitlab.com/ssb22/jianpu-ly
-# and on Bitbucket: https://bitbucket.org/ssb22/jianpu-ly
-# and at https://gitlab.developers.cam.ac.uk/ssb22/jianpu-ly
-# and in China: https://gitee.com/ssb22/jianpu-ly
+# Homepage for jp2ly: https://github.com/xmjiao/jp2ly
+# Git repository for jp2ly: https://github.com/xmjiao/jp2ly
+
+# For detailed usage and documentation, refer to the provided instructions below.
 
 # (The following doc string's format is fixed, see --html)
 r"""Run jianpu-ly < text-file > ly-file (or jianpu-ly text-files > ly-file)
@@ -103,10 +109,14 @@ def asUnicode(l):
 
 
 def lilypond_minor_version():
+    """
+    Returns the minor version number of LilyPond installed on the system.
+    If LilyPond is not installed, returns 20 (corresponding to version 2.20).
+    """
     global _lilypond_minor_version
     try:
         return _lilypond_minor_version
-    except:
+    except NameError:
         pass
     cmd = lilypond_command()
     if cmd:
@@ -123,6 +133,10 @@ def lilypond_minor_version():
 
 
 def lilypond_command():
+    """
+    Returns the path to the LilyPond executable if it is installed on the system.
+    If LilyPond is not found, returns None.
+    """
     if hasattr(shutil, "which"):
         w = shutil.which("lilypond")
         if w:
@@ -146,9 +160,14 @@ def lilypond_command():
         for t in placesToTry:
             if os.path.exists(t):
                 return t
+    return None
 
 
 def all_scores_start():
+    """
+    Returns a string containing the Lilypond code for setting up the score.
+    The code includes settings for staff size, paper size, margins, fonts, and spacing.
+    """
     staff_size = float(os.environ.get("j2ly_staff_size", 20))
     # Normal: j2ly_staff_size=20
     # Large: j2ly_staff_size=25.2
@@ -172,6 +191,28 @@ def all_scores_start():
   #(set-default-paper-size "letter" )
   #(set-paper-size "letter")
 
+  scoreTitleMarkup = \markup {
+    \fill-line {
+      \dir-column {
+        \null
+        \null
+        \left-align \fromproperty #'header:emotion
+        \left-align \fromproperty #'header:meter
+      }
+      \dir-column {
+          \center-align \fontsize #6 \bold \fromproperty #'header:title
+          \null
+          \center-align \fontsize #1 \fromproperty #'header:subtitle
+          \center-align \fromproperty #'header:piece
+      }
+      \dir-column {
+          \null
+          \right-align \fromproperty #'header:poet
+          \right-align \fromproperty #'header:composer
+          \right-align \fromproperty #'header:arranger
+      }
+    }
+  }
   % un-comment the next line for no page numbers:
   % print-page-number = ##f
 
@@ -179,6 +220,8 @@ def all_scores_start():
   % two-sided = ##t
   % inner-margin = 25\mm
   % outer-margin = 25\mm
+  top-margin = 20\mm
+  bottom-margin = 25\mm
   left-margin = 25\mm
   right-margin = 25\mm
 """
@@ -236,8 +279,6 @@ def score_end(**headers):
         for k, v in headers.items():
             if '"' not in v:
                 v = '"' + v + '"'
-            if k == "title" and "\\" not in v:
-                v = r"\markup{\fontsize #3 " + v + "}"
             ret += k + "=" + v + "\n"
         ret += "}\n"
 
@@ -1042,12 +1083,7 @@ def getInput0(f, is_google_drive=False):
         inDat.append(merge_lyrics(f))
     else:
         try:
-            try:
-                # Python 3: try UTF-8 first
-                inDat.append(merge_lyrics(open(f, encoding="utf-8").read()))
-            except FileNotFoundError:
-                # Python 2, or Python 3 with locale-default encoding in case it's not UTF-8
-                inDat.append(merge_lyrics(open(f).read()))
+            inDat.append(merge_lyrics(open(f, encoding="utf-8").read()))
         except IOError:
             errExit("Unable to read file " + f)
 
@@ -1678,6 +1714,11 @@ def process_grace_notes(
         # Append Western notation grace note
         out.append(r"\acciaccatura { " + gracenotes_western(gracenote_content) + " }")
     else:
+        if notehead_markup.tuplet != (1, 1):
+            for i in range(1, 4):
+                if r'\times' in out[-i]:
+                    out[-i] = '\\once \\override TupletBracket.padding = #2.5 ' + out[-i]
+                    break
         # Handle the jianpu notation for grace note
         afternext = graceNotes_markup(gracenote_content, 0)
         if not notehead_markup.withStaff:
@@ -1745,6 +1786,12 @@ def process_grace_notes_after(
             + " }"
         )
     else:
+        if notehead_markup.tuplet != (1, 1):
+            for i in range(1, 4):
+                if r'\times' in out[-i]:
+                    out[-i] = '\\once \\override TupletBracket.padding = #2.5 ' + out[-i]
+                    break
+
         # Handle grace notes for Jianpu notation:
         if not notehead_markup.withStaff:
             out[lastPtr] = r"\once \textLengthOn " + out[lastPtr]
