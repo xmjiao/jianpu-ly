@@ -102,16 +102,29 @@ bar_number_every = 1
 midiInstrument = "choir aahs"  # see  https://lilypond.org/doc/v2.24/Documentation/notation/midi-instruments
 
 
-def asUnicode(l):
-    if isinstance(l, six.text_type):
-        return l
-    return l.decode("utf-8")
+def as_unicode(input_string):
+    """
+    Converts the input to Unicode if it is not already in Unicode format.
+
+    Args:
+        input_str: The input to be converted to Unicode.
+
+    Returns:
+        The input in Unicode format.
+    """
+    if isinstance(input_string, six.text_type):
+        return input_string
+    elif isinstance(input_string, six.binary_type):
+        return input_string.decode("utf-8")
+    else:
+        raise TypeError("Expected unicode or bytes, got %r" % input_string)
 
 
 def lilypond_minor_version():
     """
     Returns the minor version number of LilyPond installed on the system.
     If LilyPond is not installed, returns 20 (corresponding to version 2.20).
+    :return: int
     """
     global _lilypond_minor_version
     try:
@@ -167,7 +180,9 @@ def all_scores_start():
     """
     Returns a string containing the Lilypond code for setting up the score.
     The code includes settings for staff size, paper size, margins, fonts, and spacing.
+    :return: str
     """
+
     staff_size = float(os.environ.get("j2ly_staff_size", 20))
     # Normal: j2ly_staff_size=20
     # Large: j2ly_staff_size=25.2
@@ -258,6 +273,15 @@ def all_scores_start():
 
 
 def score_start():
+    """
+    Returns the starting string for a LilyPond score.
+
+    If `midi` is True, the score will be unfolded. If `notehead_markup.noBarNums`
+    and `midi` are both False, the score will include bar numbers.
+
+    Returns:
+        str: The starting string for a LilyPond score.
+    """
     ret = "\\score {\n"
     if midi:
         ret += "\\unfoldRepeats\n"
@@ -271,6 +295,15 @@ def score_start():
 
 
 def score_end(**headers):
+    """
+    Returns a string representing the end of a music score, including any headers and MIDI information.
+
+    Args:
+        headers: A dictionary of header key-value pairs to include in the score.
+
+    Returns:
+        A string representing the end of a music score.
+    """
     ret = ">>\n"
     if headers:
         # since about Lilypond 2.7, music must come
@@ -298,7 +331,11 @@ def score_end(**headers):
     return ret + " }"
 
 
-def uniqName():
+def unique_name():
+    """
+    Returns a unique name by incrementing the global variable uniqCount and
+    translating it using the letters variable.
+    """
     global uniqCount
     r = str(uniqCount)
     uniqCount += 1
@@ -332,7 +369,7 @@ def jianpu_voice_start(isTemp=0):
     """
 
     stemLenFrac = "0.5" if not isTemp and maxBeams >= 2 else "0"
-    voiceName = uniqName()
+    voiceName = unique_name()
     r = f"""\\new Voice="{voiceName}" {{\n"""
     r += r"""
     #(set-accidental-style 'neo-modern) % Allow repeating accidentals within a measure
@@ -461,7 +498,7 @@ def midi_staff_start():
     """
     return r"""
 %% === BEGIN MIDI STAFF ===
-    \new Staff { \new Voice="%s" {""" % uniqName()
+    \new Staff { \new Voice="%s" {""" % unique_name()
 
 
 def midi_staff_end():
@@ -497,7 +534,7 @@ def western_staff_start(inst=None):
     \new Staff """
     if inst:
         r += r'\with { instrumentName = "' + inst + '" } '
-    voiceName = uniqName()
+    voiceName = unique_name()
     return (
         r + r"""{
     \override Score.SystemStartBar.collapse-height = #11 %% (needed on 2.22)
@@ -535,7 +572,7 @@ def lyrics_start(voiceName):
     This function sets up a new Lyrics context that is linked to a specified voice,
     allowing for lyrics to be aligned with the notes of that voice.
     """
-    uniqueName = uniqName()
+    uniqueName = unique_name()
     return fr'\new Lyrics = "I{uniqueName}" {{ \lyricsto "{voiceName}" {{ '
 
 
@@ -565,6 +602,16 @@ assert not (
 
 
 def errExit(msg):
+    """
+    Prints an error message and exits the program if called from the main module.
+    Otherwise, raises an Exception with the error message.
+
+    Args:
+        msg (str): The error message to print/raise.
+
+    Returns:
+        None
+    """
     if __name__ == "__main__":
         sys.stderr.write("Error: " + msg + "\n")
         sys.exit(1)
@@ -573,37 +620,69 @@ def errExit(msg):
 
 
 def scoreError(msg, word, line):
-    if len(word) > 60:
-        word = word[:50] + "..."
-    msg += " %s in score %d" % (word, scoreNo)
-    if len(line) > 600:
-        line = line[:500] + "..."
-    if not word in line:
-        pass  # above truncations caused problems
-    elif "xterm" in os.environ.get("TERM", ""):  # use xterm underline escapes
-        msg += "\n" + re.sub(
+    """
+    Generates an error message for a score, highlighting the problematic word.
+
+    Args:
+        msg (str): The base error message.
+        word (str): The word causing the error.
+        line (str): The line in which the error occurred.
+
+    Raises:
+        Exception: Raises an exception with the formatted error message.
+    """
+    MAX_WORD_LENGTH = 60
+    MAX_LINE_LENGTH = 600
+    TRUNCATED_WORD_LENGTH = 50
+    TRUNCATED_LINE_LENGTH = 500
+
+    # Truncate 'word' and 'line' if they exceed maximum lengths
+    word = word if len(word) <= MAX_WORD_LENGTH else word[:TRUNCATED_WORD_LENGTH] + "..."
+    line = line if len(line) <= MAX_LINE_LENGTH else line[:TRUNCATED_LINE_LENGTH] + "..."
+
+    # Check if the word is actually in the line
+    if word in line:
+        highlighted_line = highlight_word_in_line(word, line)
+        msg = f"{msg} {word} in score {scoreNo}\n{highlighted_line}"
+    else:
+        msg = f"{msg} {word} in score {scoreNo}\nin this line: {line}"
+
+    errExit(msg)
+
+
+def highlight_word_in_line(word, line):
+    """
+    Highlights the given word in a line for terminal output.
+
+    Args:
+        word (str): The word to highlight.
+        line (str): The line in which the word appears.
+
+    Returns:
+        str: The line with the word highlighted.
+    """
+    if "xterm" in os.environ.get("TERM", ""):
+        # Use xterm underline escapes
+        return re.sub(
             r"(\s|^)" + re.escape(word) + r"(?=\s|$)",
             lambda m: m.group(1) + "\x1b[4m" + word + "\x1b[m",
             line,
         )
-    elif re.match("[ -~]*$", line):  # all ASCII: we can underline the word with ^^s
-        msg += (
-            "\n"
-            + line
-            + "\n"
-            + re.sub(
-                "[^^]",
-                " ",
-                re.sub(
-                    r"(\s|^)" + re.escape(word) + r"(?=\s|$)",
-                    lambda m: m.group(1) + "^" * (len(word)),
-                    line,
-                ),
-            )
+    elif re.match("[ -~]*$", line):
+        # All ASCII: underline the word with '^'
+        underline = re.sub(
+            "[^^]",
+            " ",
+            re.sub(
+                r"(\s|^)" + re.escape(word) + r"(?=\s|$)",
+                lambda m: m.group(1) + "^" * len(word),
+                line,
+            ),
         )
-    else:  # don't try to underline the word (at least not without ANSI): don't know how the terminal will handle character widths
-        msg += "\nin this line: " + line
-    errExit(msg)
+        return line + "\n" + underline
+    else:
+        # Default: no special handling for non-ASCII or unsupported terminals
+        return line
 
 
 placeholders = {
@@ -623,6 +702,16 @@ placeholders = {
 
 
 def addOctaves(octave1, octave2):
+    """
+    Given two octave strings, returns the resulting octave string after adding them together.
+
+    Args:
+        octave1 (str): The first octave string.
+        octave2 (str): The second octave string.
+
+    Returns:
+        str: The resulting octave string after adding octave1 and octave2 together.
+    """
     # so it can be used with a base-octave change
     octave2 = octave2.replace(">", "'").replace("<", ",")
     while octave1:
@@ -641,12 +730,24 @@ def addOctaves(octave1, octave2):
 
 
 class NoteheadMarkup:
+    """
+    A class that defines a notehead graphical object for the figures.
+    """
     def __init__(self, withStaff=True):
+        """
+        Initializes the NoteheadMarkup object.
+
+        Args:
+        - withStaff (bool): whether to include staff in the object or not.
+        """
         self.defines_done = {}
         self.withStaff = withStaff
         self.initOneScore()
 
     def initOneScore(self):
+        """
+        Initializes the score.
+        """
         self.barLength = 64
         self.beatLength = 16  # in 64th notes
         self.barPos = self.startBarPos = F(0)
@@ -664,6 +765,9 @@ class NoteheadMarkup:
         self.unicode_approx = []
 
     def endScore(self):
+        """
+        Ends the score.
+        """
         if self.barPos == self.startBarPos:
             pass
         elif os.environ.get("j2ly_sloppy_bars", ""):
@@ -687,6 +791,13 @@ class NoteheadMarkup:
             )
 
     def setTime(self, num, denom):
+        """
+        Sets the time signature.
+
+        Args:
+        - num (int): the numerator of the time signature.
+        - denom (int): the denominator of the time signature.
+        """
         self.barLength = int(64 * num / denom)
         if denom > 4 and num % 3 == 0:
             self.beatLength = 24  # compound time
@@ -694,6 +805,13 @@ class NoteheadMarkup:
             self.beatLength = 16
 
     def setAnac(self, denom, dotted):
+        """
+        Sets the anacrusis.
+
+        Args:
+        - denom (int): the denominator of the anacrusis.
+        - dotted (bool): whether the anacrusis is dotted or not.
+        """
         self.barPos = F(self.barLength) - F(64) / denom
         if dotted:
             self.barPos -= F(64) / denom / 2
@@ -703,29 +821,64 @@ class NoteheadMarkup:
         self.startBarPos = self.barPos
 
     def wholeBarRestLen(self):
+        """
+        Returns the length of a whole bar rest.
+        """
         return {96: "1.", 48: "2.", 32: "2", 24: "4.", 16: "4", 12: "8.", 8: "8"}.get(
             self.barLength, "1"
         )  # TODO: what if irregular?
 
     def baseOctaveChange(self, change):
+        """
+        Changes the base octave.
+
+        Args:
+        - change (int): the amount of change in the octave.
+        """
         self.base_octave = addOctaves(change, self.base_octave)
 
-    def __call__(self, figures, nBeams, dots, octave, accidental, tremolo, word, line):
-        # figures is a chord string of '1'-'7', or '0' or '-'
-        # nBeams is 0, 1, 2 .. etc (number of beams for this note)
-        # dots is "" or "." or ".." etc (extra length)
-        # octave is "", "'", "''", "," or ",,"
-        # accidental is "", "#", "b"
-        # tremolo is "" or ":32"
-        # word,line is for error handling
+    def _validate_figures(self, figures, accidental, word, line):
+        """
+        Validates the figures based on specific rules and formats.
 
+        Args:
+        - figures (str): The string of figures to be validated.
+        - accidental (str): The accidental associated with the figures.
+        - word (str): The word for context, used in error reporting.
+        - line (int): The line number for context, used in error reporting.
+
+        Raises:
+        - Exception: If validation fails.
+        """
+        # Check if figures contain more than one character
         if len(figures) > 1:
-            if accidental:
-                # see TODOs below
-                scoreError("Accidentals in chords not yet implemented:", word, line)
             if "0" in figures:
                 scoreError("Can't have rest in chord:", word, line)
-        self.notesHad.append(figures)
+            if "-" in figures:
+                scoreError("Dash not allowed in multi-figure chords:", word, line)
+            if accidental:
+                scoreError("Accidentals in chords not yet implemented:", word, line)
+
+    def _process_figures(self, figures, accidental, octave, word, line):
+        """
+        Processes the figures to extract note names and placeholder chords.
+
+        Args:
+        - figures (str): a chord string of '1'-'7', or '0' or '-'.
+        - accidental (str): '', '#', 'b'.
+        - octave (str): '', "'", "''", "," or ",,".
+        - word (str): for error handling.
+        - line (int): for error handling.
+
+        Returns:
+        - name (str): Concatenated name of the note.
+        - placeholder_chord (str): Placeholder chord string.
+        - updated_figures (str): Modified figures.
+        - updated_accidental (str): Modified accidental.
+        - updated_octave (str): Modified octave.
+        - invisTieLast (bool): Flag indicating if an invisible tie is present.
+        """
+
         names = {
             "0": "nought",
             "1": "one",
@@ -768,13 +921,41 @@ class NoteheadMarkup:
             accidental = self.last_accidental  # ditto
         else:
             octave = addOctaves(octave, self.base_octave)
-            if not octave in [",,", ",", "", "'", "''"]:
+            if octave not in [",,", ",", "", "'", "''"]:
                 scoreError("Can't handle octave " + octave + " in", word, line)
             self.last_octave = octave
         self.last_figures = figures
         if len(self.last_figures) > 1 and self.last_figures[0] == "-":
             self.last_figures = self.last_figures[1:]
-        if not accidental in ["", "#", "b"]:
+
+        return name, placeholder_chord, figures, accidental, octave, invisTieLast
+
+    def __call__(self, figures, nBeams, dots, octave, accidental, tremolo, word, line):
+        """
+        Calls the NoteheadMarkup object.
+
+        Args:
+        - figures (str): a chord string of '1'-'7', or '0' or '-'.
+        - nBeams (int): number of beams for this note.
+        - dots (str): extra length.
+        - octave (str): '', "'", "''", "," or ",,".
+        - accidental (str): '', '#', 'b'.
+        - tremolo (str): '' or ':32'.
+        - word (str): for error handling.
+        - line (int): for error handling.
+        """
+
+        # Validate figures
+        self._validate_figures(figures, accidental, word, line)
+
+        # Keep track of notes processed
+        self.notesHad.append(figures)
+
+        # Process figures
+        name, placeholder_chord, figures, accidental, octave, invisTieLast = \
+            self._process_figures(figures, accidental, octave, word, line)
+
+        if accidental not in ["", "#", "b"]:
             scoreError("Can't handle accidental " + accidental + " in", word, line)
         self.last_accidental = accidental
         if figures not in self.defines_done and not midi and not western:
@@ -1062,6 +1243,30 @@ class NoteheadMarkup:
 
 
 def parseNote(word, origWord, line):
+    """
+    Parses a note in Jianpu notation and returns its components.
+
+    This function interprets the Jianpu note notation, extracting the pitch,
+    rhythm, and other musical characteristics.
+
+    Args:
+        word (str): The Jianpu notation for the note.
+        origWord (str): The original word before any modifications.
+        line (int): The line number where the note appears.
+
+    Returns:
+        tuple: A tuple containing the following components of the note:
+            - figures (str): The figures representing the note's pitch (e.g., '1', '2', ... '7').
+            - nBeams (int or None): The number of beams representing the note's rhythm (None if unspecified).
+            - dots (str): Dots representing the note's duration extension.
+            - octave (str): The octave indicator ('', ''', ''', ',', ',,').
+            - accidental (str): The accidental ('#' for sharp, 'b' for flat, or '' if none).
+            - tremolo (str): The tremolo notation (e.g., ':32') or an empty string if none.
+
+    Raises:
+        ValueError: If an unrecognized command is found in the word.
+    """
+
     if word == ".":
         # (for not angka, TODO: document that this is now acceptable as an input word?)
         word = "-"
@@ -1099,7 +1304,21 @@ def parseNote(word, origWord, line):
 
 
 def write_docs():
-    # Write an HTML or Markdown version of the doc string
+    """
+    Write an HTML or Markdown version of the doc string.
+
+    This function takes no arguments and returns nothing. It reads the docstring
+    of the current module and converts it into an HTML or Markdown table,
+    depending on the command line arguments passed to the script. The table
+    contains information about the function arguments and their types.
+
+    If the "--html" argument is passed, the table is formatted as an HTML table.
+    If the "--markdown" argument is passed, the table is formatted as a Markdown table.
+    If neither argument is passed, the table is formatted as plain text.
+
+    The function prints the resulting table to standard output.
+    """
+
     def htmlify(l):
         if "--html" in sys.argv:
             return l.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -1191,6 +1410,14 @@ def merge_lyrics(content):
 
 
 def getInput0(f, is_google_drive=False):
+    """
+    This function reads input data from a file or from standard input. If the
+    input file is not found, it raises an IOError.
+    :param f: The input file path.
+    :param is_google_drive: A boolean flag indicating whether the input file
+              is on Google Drive.
+    :return: A list containing the input data.
+    """
     inDat = []
 
     # Check if we are reading from Google Drive or a local file
@@ -1251,6 +1478,16 @@ def get_input(infile, is_google_drive=False):
 
 
 def fix_utf8(stream, mode):
+    """
+    Fixes the encoding of the given stream to UTF-8, regardless of the system locale.
+
+    Args:
+        stream: The stream to fix the encoding for.
+        mode: The mode in which the stream is opened ("r" for reading, "w" for writing, etc.).
+
+    Returns:
+        The stream with the fixed encoding.
+    """
     if isinstance(
         "", six.text_type
     ):  # Python 3: please use UTF-8 for Lilypond, even if the system locale says something else
@@ -1265,6 +1502,15 @@ def fix_utf8(stream, mode):
 
 
 def fix_fullwidth(t):
+    """
+    Replaces fullwidth characters in a string with their ASCII equivalents.
+
+    Args:
+    t (str): The string to be processed.
+
+    Returns:
+    str: The processed string with fullwidth characters replaced by their ASCII equivalents.
+    """
     if isinstance("", six.text_type):
         utext = t
     else:
@@ -1287,6 +1533,16 @@ def fix_fullwidth(t):
 
 
 def graceNotes_markup(notes, isAfter):
+    """
+    Returns a LilyPond markup string for a sequence of grace notes.
+
+    Args:
+        notes (str): A string representing the sequence of grace notes.
+        isAfter (bool): A boolean indicating whether the grace notes come after the main note.
+
+    Returns:
+        str: A LilyPond markup string for the grace notes.
+    """
     if isAfter:
         cmd = "jianpu-grace-after"
     else:
@@ -1498,11 +1754,11 @@ def convert_ties_to_slurs(jianpu):
 
 def reformat_slurs(jianpu):
     """
-    Reformat slurs in Jianpu notation by moving opening and closing parentheses 
+    Reformat slurs in Jianpu notation by moving opening and closing parentheses
     to after any dashes.
 
-    In Jianpu notation, slurs are typically represented by parentheses. This function 
-    adjusts the positioning of these parentheses so that they follow any dashes ("-"), 
+    In Jianpu notation, slurs are typically represented by parentheses. This function
+    adjusts the positioning of these parentheses so that they follow any dashes ("-"),
     which represent extended note durations or connections between notes.
 
     Args:
@@ -1511,9 +1767,9 @@ def reformat_slurs(jianpu):
     Returns:
         str: The Jianpu notation string with slurs reformatted.
 
-    The function first removes any comments from the Jianpu string. Then, it searches for 
-    patterns where a slur parenthesis precedes a dash and rearranges them so that the 
-    parenthesis follows the dash. This reformatting aids in the visual clarity and 
+    The function first removes any comments from the Jianpu string. Then, it searches for
+    patterns where a slur parenthesis precedes a dash and rearranges them so that the
+    parenthesis follows the dash. This reformatting aids in the visual clarity and
     correctness of the notation.
     """
     # Remove comments from the input
@@ -1542,7 +1798,7 @@ def process_lyrics_line(line, do_hanzi_spacing):
     if (
         line
         and "1" <= line[0] <= "9"
-        and (line[1] == "." or asUnicode(line)[1] == "\uff0e")
+        and (line[1] == "." or as_unicode(line)[1] == "\uff0e")
     ):
         # a verse number
         toAdd = r'\set stanza = #"%s." ' % line[:1]
@@ -1562,7 +1818,7 @@ def process_lyrics_line(line, do_hanzi_spacing):
             l2.append(toAdd)
             toAdd = ""
         needSpace = 0
-        for c in list(asUnicode(line)):
+        for c in list(as_unicode(line)):
             # TODO: also cover those outside the BMP?  but beware narrow Python builds
             is_hanzi = 0x3400 <= ord(c) < 0xA700
             is_openquote = c in "\u2018\u201c\u300A"
@@ -2472,6 +2728,15 @@ def process_input(inDat, withStaff=False):
 
 
 def get_unicode_approx(inDat):
+    """
+    Returns the Unicode approximation of the given input data.
+
+    Args:
+        inDat (str): The input data to be converted to Unicode.
+
+    Returns:
+        str: The Unicode approximation of the input data.
+    """
     if re.search(r"\sNextPart\s", " " + inDat + " "):
         errExit("multiple parts in Unicode mode not yet supported")
     if re.search(r"\sNextScore\s", " " + inDat + " "):
@@ -2493,13 +2758,22 @@ def get_unicode_approx(inDat):
 
 try:
     from shlex import quote
-except:
-
+except ImportError:
     def quote(f):
         return "'" + f.replace("'", "'\"'\"'") + "'"
 
 
 def write_output(outDat, fn, infile):
+    """
+    Write the output data to a file or to the console.
+
+    Args:
+    - outDat: the output data to be written
+    - fn: the file name to write to, or None to write to the console
+    - infile: the input file name
+
+    Returns: None
+    """
     if sys.stdout.isatty():
         if unicode_mode:
             if sys.platform == "win32" and sys.version_info() < (3, 6):
@@ -2721,6 +2995,12 @@ def download_file_from_google_drive(id):
 
 
 def parse_arguments():
+    """
+    Parse command line arguments.
+
+    Returns:
+        args (argparse.Namespace): An object containing parsed arguments.
+    """
     # Create ArgumentParser object
     parser = argparse.ArgumentParser()
 
