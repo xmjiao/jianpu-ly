@@ -314,6 +314,7 @@ def jianpu_voice_start(isTemp=0):
     voiceName = uniqName()
     r = (r"""\new Voice="%s" {""" % voiceName) + "\n"
     r += r"""
+    \accidentalStyle neo-modern  % Allow repeating accidentals within a measure
     \override Beam #'transparent = ##f % (needed for LilyPond 2.18 or the above switch will also hide beams)
     """
     if not_angka:
@@ -377,7 +378,7 @@ def jianpu_staff_start(inst=None, withStaff=False):
         + r"""
     \override Staff.TimeSignature #'style = #'numbered
     \override Staff.Stem #'transparent = ##t
-    \set Score.accidentalStyle = #'forget
+    %\set Score.accidentalStyle = #'forget
     """
     )
     return r, voiceName
