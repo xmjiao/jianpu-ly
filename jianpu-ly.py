@@ -306,86 +306,143 @@ def uniqName():
 
 
 def jianpu_voice_start(isTemp=0):
-    if not isTemp and maxBeams >= 2:
-        # sometimes needed if the semiquavers occur in isolation rather than in groups (TODO do we need to increase this for 3+ beams in some cases?)
-        stemLenFrac = "0.5"
-    else:
-        stemLenFrac = "0"
-    voiceName = uniqName()
-    r = (r"""\new Voice="%s" {""" % voiceName) + "\n"
-    r += r"""
-    \accidentalStyle neo-modern  % Allow repeating accidentals within a measure
-    \override Beam #'transparent = ##f % (needed for LilyPond 2.18 or the above switch will also hide beams)
     """
+    Create a new voice for Jianpu notation in LilyPond. Configures various
+    overrides and settings for Jianpu, replacing standard noteheads with numbers.
+
+    Args:
+        isTemp (int, optional): Indicates if the voice is temporary (1) or not (0).
+                                Temporary voices may have different settings,
+                                particularly for stem length. Default is 0.
+
+    Returns:
+        tuple: A tuple containing:
+               - A string with LilyPond code for initializing a new voice.
+               - The name of the created voice.
+
+    This function sets several overrides for the voice:
+        - Beam visibility, thickness, and transparency are configured.
+        - Stem direction and length are set based on the voice type and beam count.
+        - Tie positions and tuplet directions are adjusted for Jianpu style.
+        - Rest style is set to 'neomensural' for better alignment.
+        - Accidental style is set to 'neo-modern', allowing repeating accidentals
+          within a measure.
+        - The 'chordChanges' property is set to True, enabling the substitution of
+          Jianpu numbers for noteheads when 'chordChanges' is True.
+    """
+
+    stemLenFrac = "0.5" if not isTemp and maxBeams >= 2 else "0"
+    voiceName = uniqName()
+    r = f"""\\new Voice="{voiceName}" {{\n"""
+    r += r"""
+    #(set-accidental-style 'neo-modern) % Allow repeating accidentals within a measure
+    \override Beam #'transparent = ##f
+    """
+
     if not_angka:
         r += r"""
         \override Stem #'direction = #UP
         \override Tie #'staff-position = #-2.5
-        \tupletDown"""
+        \tupletDown
+        """
         stemLenFrac = str(0.4 + 0.2 * max(0, maxBeams - 1))
     else:
-        r += (
-            r"""\override Stem #'direction = #DOWN
+        r += r"""
+        \override Stem #'direction = #DOWN
         \override Tie #'staff-position = #2.5
         \override Beam.positions = #'(-1 . -1)
-        \tupletUp"""
-            + "\n"
-        )
+        \tupletUp
+        """
 
     r += rf"""
     \override Stem #'length-fraction = #{stemLenFrac}
     \override Beam #'beam-thickness = #0.1
     \override Beam #'length-fraction = #-0.5
-    \override Voice.Rest #'style = #'neomensural %% this size tends to line up better (we'll override the appearance anyway)
+    \override Voice.Rest #'style = #'neomensural
     \override Accidental #'font-size = #-4
-    \override TupletBracket #'bracket-visibility = ##t"""
-    r += (
-        "\n" + r"""\set Voice.chordChanges = ##t %% 2.19 bug workaround"""
-    )  # LilyPond 2.19.82: \applyOutput docs say "called for every layout object found in the context Context at the current time step" but 2.19.x breaks this by calling it for ALL contexts in the current time step, hence breaking our WithStaff by applying our jianpu numbers to the 5-line staff too.  Obvious workaround is to make our function check that the context it's called with matches our jianpu voice, but I'm not sure how to do this other than by setting a property that's not otherwise used, which we can test for in the function.  So I'm 'commandeering' the "chordChanges" property (there since at least 2.15 and used by Lilypond only when it's in chord mode, which we don't use, and if someone adds a chord-mode staff then it won't print noteheads anyway): we will substitute jianpu numbers for noteheads only if chordChanges = #t.
+    \override TupletBracket #'bracket-visibility = ##t
+    \set Voice.chordChanges = ##t %% 2.19 bug workaround
+    """
+
     return r + "\n", voiceName
 
 
 def jianpu_staff_start(inst=None, withStaff=False):
-    # (we add "BEGIN JIANPU STAFF" and "END JIANPU STAFF" comments to make it easier to copy/paste into other Lilypond files)
-    if withStaff:
-        # we'll put the label on the 5-line staff (TODO: use StaffGroup or something?)
-        inst = None
-    if not_angka:
-        r = r"""
-%% === BEGIN NOT ANGKA STAFF ===
-    \new RhythmicStaff \with {"""
-    else:
-        r = r"""
-%% === BEGIN JIANPU STAFF ===
-    \new RhythmicStaff \with {
-    \consists "Accidental_engraver" """
+    """
+    Initialize the start of a Jianpu or Not Angka staff in LilyPond notation.
+
+    This function prepares the LilyPond string for starting a new RhythmicStaff,
+    configured for either Jianpu or Not Angka notation. It includes several
+    overrides to adjust the appearance of the staff and bar lines, and optionally
+    includes settings for an associated Western staff.
+
+    Args:
+        inst (str, optional): The name of the instrument, if applicable. Default is None.
+        withStaff (bool, optional): Flag to indicate whether to include settings for an
+                                    associated Western staff. Default is False.
+
+    Returns:
+        tuple: A tuple containing:
+               - A string with LilyPond code for initializing the staff.
+               - The name of the created voice from jianpu_voice_start function.
+
+    The function adds comments to mark the beginning of the staff section.
+    If 'withStaff' is True, it adjusts the spacing between the Jianpu and the
+    Western staff. It also sets various overrides to remove the staff lines
+    (making it a RhythmicStaff) but retain the bar lines.
+    """
+
+    # Adding comments for ease of copy/pasting into other files
+    r = "\n%% === BEGIN NOT ANGKA STAFF ===\n" if not_angka else "\n%% === BEGIN JIANPU STAFF ===\n"
+    r += r"\new RhythmicStaff \with {"
+    r += "\n    \\consists \"Accidental_engraver\" " if not not_angka else ""
+
+    # Adding instrument name if provided
     if inst:
-        r += 'instrumentName = "' + inst + '"'
+        r += '\n    instrumentName = "' + inst + '"'
+
+    # Adjusting spacing for an associated Western staff
     if withStaff:
         r += r"""
-   %% Limit space between Jianpu and corresponding-Western staff
-   \override VerticalAxisGroup.staff-staff-spacing = #'((minimum-distance . 7) (basic-distance . 7) (stretchability . 0))
-"""  # (whether this is needed or not depends on Lilypond version; 2.22 puts more space than 2.18,2.20.  Must set higher than 5, which sometimes gets collisions between beams in 2.20)
+    %% Limit space between Jianpu and corresponding-Western staff
+    \override VerticalAxisGroup.staff-staff-spacing = #'((minimum-distance . 7) (basic-distance . 7) (stretchability . 0))
+    """
+
+    # Overrides for the appearance of the staff and bar lines
     r += r"""
     %% Get rid of the stave but not the barlines:
-    \override StaffSymbol #'line-count = #0 %% tested in 2.15.40, 2.16.2, 2.18.0, 2.18.2, 2.20.0 and 2.22.2
-    \override BarLine #'bar-extent = #'(-2 . 2) %% LilyPond 2.18: please make barlines as high as the time signature even though we're on a RhythmicStaff (2.16 and 2.15 don't need this although its presence doesn't hurt; Issue 3685 seems to indicate they'll fix it post-2.18)
+    \override StaffSymbol #'line-count = #0
+    \override BarLine #'bar-extent = #'(-2 . 2)
     }
     { """
+
+    # Initialize Jianpu voice settings
     j, voiceName = jianpu_voice_start()
-    r += (
-        j
-        + r"""
+    r += j
+    r += r"""
     \override Staff.TimeSignature #'style = #'numbered
     \override Staff.Stem #'transparent = ##t
-    %\set Score.accidentalStyle = #'forget
     """
-    )
+
     return r, voiceName
 
 
 def jianpu_staff_end():
-    # \bar "|." is added separately if there's not a DC etc
+    """
+    Conclude the Jianpu or Not Angka staff section in LilyPond notation.
+
+    This function generates the closing braces for a staff section initiated by
+    jianpu_staff_start. It also adds a comment indicating the end of the staff section.
+
+    Returns:
+        str: A string containing the LilyPond code to end the staff section.
+
+    The function determines whether to label the end of the section as "JIANPU" or
+    "NOT ANGKA" based on the global flag 'not_angka'. The returned string is used
+    to properly close the staff block in the LilyPond file.
+    """
+
+    # Close the staff section with appropriate comments
     if not_angka:
         return "} }\n% === END NOT ANGKA STAFF ===\n"
     else:
@@ -393,18 +450,48 @@ def jianpu_staff_end():
 
 
 def midi_staff_start():
+    """
+    Begin a new MIDI staff section in LilyPond notation.
+
+    Returns:
+        str: A string containing the LilyPond code to start a new MIDI staff.
+
+    This function generates the LilyPond code to start a new MIDI staff with a unique voice name.
+    It includes a comment indicating the beginning of the MIDI staff section.
+    """
     return r"""
 %% === BEGIN MIDI STAFF ===
-    \new Staff { \new Voice="%s" {""" % (
-        uniqName(),
-    )
+    \new Staff { \new Voice="%s" {""" % uniqName()
 
 
 def midi_staff_end():
+    """
+    Conclude the MIDI staff section in LilyPond notation.
+
+    Returns:
+        str: A string containing the LilyPond code to end the MIDI staff section.
+
+    This function generates the closing braces for the MIDI staff section along with a comment.
+    """
     return "} }\n% === END MIDI STAFF ===\n"
 
 
 def western_staff_start(inst=None):
+    """
+    Begin a new Western (5-line) staff section in LilyPond notation.
+
+    Args:
+        inst (str, optional): The name of the instrument, if applicable. Default is None.
+
+    Returns:
+        tuple: A tuple containing:
+               - A string with LilyPond code to start a new Western staff.
+               - The name of the created voice.
+
+    This function prepares the LilyPond string for starting a new Staff,
+    configured for Western notation. It includes various overrides for appearance
+    and an optional instrument name.
+    """
     r = r"""
 %% === BEGIN 5-LINE STAFF ===
     \new Staff """
@@ -412,30 +499,56 @@ def western_staff_start(inst=None):
         r += r'\with { instrumentName = "' + inst + '" } '
     voiceName = uniqName()
     return (
-        (
-            r
-            + r"""{
+        r + r"""{
     \override Score.SystemStartBar.collapse-height = #11 %% (needed on 2.22)
     \new Voice="%s" {
     #(set-accidental-style 'modern-cautionary)
     \override Staff.TimeSignature #'style = #'numbered
     \set Voice.chordChanges = ##f %% for 2.19.82 bug workaround
-"""
-            % (voiceName,)
-        ),
+""" % voiceName,
         voiceName,
     )
 
 
 def western_staff_end():
+    """
+    Conclude the Western (5-line) staff section in LilyPond notation.
+
+    Returns:
+        str: A string containing the LilyPond code to end the Western staff section.
+
+    This function generates the closing braces for the Western staff section along with a comment.
+    """
     return "} }\n% === END 5-LINE STAFF ===\n"
 
 
 def lyrics_start(voiceName):
-    return r'\new Lyrics = "I%s" { \lyricsto "%s" { ' % (uniqName(), voiceName)
+    """
+    Begin a new Lyrics section associated with a specific voice in LilyPond notation.
+
+    Args:
+        voiceName (str): The name of the voice to which the lyrics are associated.
+
+    Returns:
+        str: A string containing the LilyPond code to start a new Lyrics section.
+
+    This function sets up a new Lyrics context that is linked to a specified voice,
+    allowing for lyrics to be aligned with the notes of that voice.
+    """
+    uniqueName = uniqName()
+    return fr'\new Lyrics = "I{uniqueName}" {{ \lyricsto "{voiceName}" {{ '
 
 
 def lyrics_end():
+    """
+    Conclude the Lyrics section in LilyPond notation.
+
+    Returns:
+        str: A string containing the LilyPond code to end the Lyrics section.
+
+    This function generates the closing braces for the Lyrics section,
+    properly closing the Lyrics context in the LilyPond file.
+    """
     return "} }"
 
 
@@ -1383,6 +1496,37 @@ def convert_ties_to_slurs(jianpu):
     return converted_jianpu.strip().replace("__TIE__", "~")
 
 
+def reformat_slurs(jianpu):
+    """
+    Reformat slurs in Jianpu notation by moving opening and closing parentheses 
+    to after any dashes.
+
+    In Jianpu notation, slurs are typically represented by parentheses. This function 
+    adjusts the positioning of these parentheses so that they follow any dashes ("-"), 
+    which represent extended note durations or connections between notes.
+
+    Args:
+        jianpu (str): A string containing Jianpu notation, which may include slurs.
+
+    Returns:
+        str: The Jianpu notation string with slurs reformatted.
+
+    The function first removes any comments from the Jianpu string. Then, it searches for 
+    patterns where a slur parenthesis precedes a dash and rearranges them so that the 
+    parenthesis follows the dash. This reformatting aids in the visual clarity and 
+    correctness of the notation.
+    """
+    # Remove comments from the input
+    jianpu = re.sub(r"%.*$", "", jianpu, flags=re.MULTILINE).replace("|", "")
+
+    # Move opening and closing parenthesis after dashes
+    return re.sub(
+        r'(\s+[\(\)])((?:(?:\s+-)(?:\s+[\^_]"[^"]*")*' + r")+)",
+        r"\2\1",
+        jianpu,
+    )
+
+
 def process_lyrics_line(line, do_hanzi_spacing):
     """
     Process a line of lyrics, including handling verse numbers and Chinese character spacing.
@@ -1994,9 +2138,13 @@ def getLY(score, headers=None, midi=True):
                and the dictionary of headers.
     """
 
-    # Convert ties to slurs if MIDI output is not being generated
+    # Check if MIDI output is not being generated
     if not midi:
+        # In Jianpu, ties need to be converted into slurs.
         score = convert_ties_to_slurs(score)
+    else:
+        # In Staff, slurs should not break dashes.
+        score = reformat_slurs(score)
 
     # Use an empty dictionary for headers if not provided to avoid mutable default argument
     if not headers:
@@ -2415,7 +2563,7 @@ For Unicode approximation on this system, please do one of these things:
     fix_utf8(sys.stdout, "w").write(outDat)
 
 
-def reformat_key_time_signatures(s):
+def reformat_key_time_signatures(s, with_staff):
     """
     Reformat the key and time signatures within a given string representing musical notation.
 
@@ -2491,7 +2639,10 @@ def reformat_key_time_signatures(s):
         )
 
         # Compute the dynamic spacing based on the length of the time signatures
-        hspace_value = 11 + (len(time_signatures) - 1) * 2
+        if not with_staff:
+            hspace_value = 11 + (len(time_signatures) - 1) * 2
+        else:
+            hspace_value = 1
 
         omittimesig = r"\\omit Staff.TimeSignature" if len(time_signatures) == 1 else ""
 
@@ -2755,8 +2906,8 @@ def main():
         inDat = get_input(args.input_file)
 
     out = process_input(inDat, args.staff_only or args.with_staff)
-    if not args.staff_only and not args.with_staff:
-        out = reformat_key_time_signatures(out)
+    if not args.staff_only:
+        out = reformat_key_time_signatures(out, args.with_staff)
 
     if args.staff_only:
         out = filter_out_jianpu(out)
