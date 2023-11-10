@@ -377,6 +377,7 @@ def jianpu_staff_start(inst=None, withStaff=False):
         + r"""
     \override Staff.TimeSignature #'style = #'numbered
     \override Staff.Stem #'transparent = ##t
+    \set Score.accidentalStyle = #'forget
     """
     )
     return r, voiceName
@@ -2421,8 +2422,9 @@ def reformat_key_time_signatures(s):
 
     1. Reformat key signatures found in the string:
        It searches for key signature markup patterns such as "\\markup{1=A\\flat}" and
-       reformats them to "\markup{1=bA}", where 'A' represents any note and '\\flat'
-       is optional, indicating a flat note.
+       reformats them to "\markup{1=♭A}". Similarly, "\\markup{1=A\\sharp}" is reformatted
+       to "\markup{1=♯A}", where 'A' represents any note and '\\flat' or '\\sharp'
+       is optional, indicating a flat or sharp note.
 
     2. Extract the section of the string that contains Jianpu staff notation, which is
        bounded by the markers "%% === BEGIN JIANPU STAFF ===" and "% === END JIANPU STAFF ===".
@@ -2445,14 +2447,19 @@ def reformat_key_time_signatures(s):
     - str: The reformatted string with updated key and time signatures.
     """
 
-    # This pattern captures the key signature part including '1=' and any following \flat
-    key_signature_pattern = re.compile(r"\\markup\{\s*1=([A-G])(\\flat)?\}")
+    # This pattern captures the key signature part including '1=' and any following \flat or \sharp
+    key_signature_pattern = re.compile(r"\\markup\{\s*1=([A-G])(\\flat|\\sharp)?\}")
 
     # Replace occurrences with the correct formatting.
     def replace_key_signature(match):
         note = match.group(1)
         alteration = match.group(2)
-        alteration_symbol = "b" if alteration == "\\flat" else ""
+        if alteration == "\\flat":
+            alteration_symbol = "♭"
+        elif alteration == "\\sharp":
+            alteration_symbol = "♯"
+        else:
+            alteration_symbol = ""
         return f"\\markup{{1={alteration_symbol}{note}}}"
 
     # Replace key signatures using the pattern
@@ -2489,7 +2496,7 @@ def reformat_key_time_signatures(s):
 
         # Update key signature line in the original string
         s = re.sub(
-            r"(\\mark \\markup\{)1=(b?[A-G](\\sharp)?)\}",
+            r"(\\mark \\markup\{)1=([♭♯]?[A-G])\}",
             rf"\1\\hspace #{hspace_value} 1=\2 "
             + time_signatures_str.replace("\\", "\\\\")
             + "}"
