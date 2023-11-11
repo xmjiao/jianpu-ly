@@ -311,7 +311,7 @@ def score_end(**headers):
         # before the header block if it's per-score
         ret += r"\header{" + "\n"
         for k, v in headers.items():
-            if '"' not in v and r'\markup' not in v:
+            if '"' not in v and r"\markup" not in v:
                 v = '"' + v + '"'
             ret += k + "=" + v + "\n"
         # Placeholder for key and time signatures
@@ -2898,56 +2898,34 @@ For Unicode approximation on this system, please do one of these things:
 
 def reformat_key_time_signatures(s, with_staff):
     """
-    Reformat the key and time signatures within a given string representing musical notation.
-
-    The function performs the following operations:
-
-    1. Reformat key signatures found in the string:
-       It searches for key signature markup patterns such as "\\markup{1=A\\flat}" and
-       reformats them to "\markup{1=♭A}". Similarly, "\\markup{1=A\\sharp}" is reformatted
-       to "\markup{1=♯A}", where 'A' represents any note and '\\flat' or '\\sharp'
-       is optional, indicating a flat or sharp note.
-
-    2. Extract the section of the string that contains Jianpu staff notation, which is
-       bounded by the markers "%% === BEGIN JIANPU STAFF ===" and "% === END JIANPU STAFF ===".
-
-    3. Within the extracted Jianpu staff notation section, it finds all unique time signatures
-       that match the pattern "\time X/Y", where X and Y are numerical values.
-
-    4. Sort the unique time signatures by their numerical values and format them as spaced strings
-       using the pattern "\hspace #1 \fraction X Y".
-
-    5. Dynamically compute horizontal spacing based on the number of time signatures found, and
-       reformat the key signature line in the original string to include the sorted time
-       signatures and dynamic spacing. If only one time signature is found, it includes the
-       command to omit the time signature from the staff.
+    Reformat key and time signatures in a string representing musical notation. The function
+    reformats key signatures, extracts Jianpu staff notation, sorts unique time signatures,
+    and updates the key signature line to include sorted time signatures. If there's only
+    one time signature, it includes a command to omit it from the staff.
 
     Args:
-    - s (str): The input string containing the musical notation to be reformatted.
+    - s (str): String containing musical notation to be reformatted.
+    - with_staff (bool): Unused parameter, kept for backward compatibility.
 
     Returns:
-    - str: The reformatted string with updated key and time signatures.
+    - str: Reformatted string with updated key and time signatures.
     """
 
-    # This pattern captures the key signature part including '1=' and any following \flat or \sharp
+    # Pattern to capture key signature with optional flat or sharp
     key_signature_pattern = re.compile(r"\\markup\{\s*1=([A-G])(\\flat|\\sharp)?\}")
 
-    # Replace occurrences with the correct formatting.
+    # Function to replace key signature matches with correct formatting
     def replace_key_signature(match):
-        note = match.group(1)
-        alteration = match.group(2)
-        if alteration == "\\flat":
-            alteration_symbol = "♭"
-        elif alteration == "\\sharp":
-            alteration_symbol = "♯"
-        else:
-            alteration_symbol = ""
+        note, alteration = match.group(1), match.group(2)
+        alteration_symbol = (
+            "♭" if alteration == "\\flat" else "♯" if alteration == "\\sharp" else ""
+        )
         return f"\\markup{{1={alteration_symbol}{note}}}"
 
-    # Replace key signatures using the pattern
+    # Apply replacement to key signatures
     s = key_signature_pattern.sub(replace_key_signature, s)
 
-    # Extract section between "%% === BEGIN JIANPU STAFF ===" and "% === END JIANPU STAFF ==="
+    # Extract Jianpu staff notation section
     jianpu_staff_section_match = re.search(
         r"%% === BEGIN JIANPU STAFF ===(.*?)% === END JIANPU STAFF ===", s, re.DOTALL
     )
@@ -2955,35 +2933,32 @@ def reformat_key_time_signatures(s, with_staff):
     if jianpu_staff_section_match:
         jianpu_staff_section = jianpu_staff_section_match.group(1)
 
-        # Find unique time signatures
-        time_signatures = set(re.findall(r"\\time\s+(\d+)/(\d+)", jianpu_staff_section))
+        # Find unique time signatures and maintain their order of occurrences
+        time_signatures = re.findall(r"\\time\s+(\d+)/(\d+)", jianpu_staff_section)
 
-        # Sort time signatures from smallest to largest (by their numerical values)
-        time_signatures_sorted = sorted(
-            time_signatures, key=lambda ts: (int(ts[0]), int(ts[1]))
-        )
+        # Remove duplicates while preserving order using dict.fromkeys()
+        time_signatures_ordered = list(dict.fromkeys(time_signatures))
 
-        # Convert sorted time signatures back to strings in the desired format
+        # Convert ordered time signatures back to strings in the preferred format
         time_signatures_str = " ".join(
             [
                 f"\\hspace #1 \\fraction {num} {denom}"
-                for num, denom in time_signatures_sorted
+                for num, denom in time_signatures_ordered
             ]
         )
 
-        omittimesig = r"\\omit Staff.TimeSignature" if len(time_signatures) == 1 else ""
+        omittimesig = r"\\once \\omit Staff.TimeSignature"
 
-        # Update key signature line in the original string
+        # Update original string with sorted time signatures
         keysig = re.search(r"\\mark \\markup\{\s*([16]=[♭♯]?[A-G])\}", s).group(1)
         s = re.sub(r"(\\mark \\markup\{)[16]=([♭♯]?[A-G])\}", omittimesig, s)
-
         s = s.replace(
             'keytimesignature=""',
             r"keytimesignature=\markup{ \concat { "
             + keysig
             + " "
             + time_signatures_str
-            + " } }"
+            + " } }",
         )
 
     return s
