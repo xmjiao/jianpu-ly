@@ -1371,42 +1371,69 @@ def write_docs():
 
 def merge_lyrics(content):
     """
-    Merge all lines starting with "H:" in each part of the the given content (separated by "NextPart")
-    and replaces the first "H:" line in each part with the merged line.
+    Merge lines starting with "H:" in each content part, separated by "NextPart" or
+    "NextScore". Replaces the first "H:" line in each part with a merged line of all
+    "H:" lines. Also replaces patterns 'w*n' with 'n' occurrences of 'w', ensuring '_'
+    is spaced. Only lines starting with "H:" are processed.
 
     Args:
-        content (str): The content to process.
+        content (str): Content with parts separated by "NextPart" or "NextScore".
 
     Returns:
-        str: The processed content.
+        str: Processed content with merged "H:" lines and preserved separators.
     """
 
     def process_part(part):
-        # Extract all lines starting with "H:" and merge them
-        h_lines = re.findall(r"^H:.*$", part, re.MULTILINE)
+        # Process each "H:" line individually
+        def process_line(line):
+            # Replace w*n pattern with n copies of w
+            line = re.sub(r"(.)\*(\d+)",
+                          lambda m: ''.join([m.group(1)] * int(m.group(2))),
+                          line)
+            # Ensure '_' is properly spaced
+            line = re.sub(r"(?<!\s)_", " _", line)
+            line = re.sub(r"_(?!\s)", "_ ", line)
+            return line
+
+        # Extract and merge lines starting with "H:"
+        h_lines = re.findall(r"^\s*H:.*$", part, re.MULTILINE)
+        if not h_lines:
+            return part  # Return as-is if no "H:" lines
+
+        h_lines = [process_line(line).strip() for line in h_lines]
         merged_line = "H:" + " ".join([line[2:].strip() for line in h_lines])
 
-        # Replace the first "H:" line with the merged line and remove all other "H:" lines
+        # Replace first "H:" line with merged line and remove others
         def replace_first_H(match):
             replace_first_H.first_encountered = True
             return merged_line
 
         replace_first_H.first_encountered = False
-        part = re.sub(
-            r"^H:.*$",
-            lambda m: replace_first_H(m)
-            if not replace_first_H.first_encountered
-            else "",
-            part,
-            flags=re.MULTILINE,
-        )
+        part = re.sub(r"^\s*H:.*$",
+                      lambda m: replace_first_H(m)
+                      if not replace_first_H.first_encountered
+                      else "",
+                      part,
+                      flags=re.MULTILINE)
+
+        # Also replace '0\*\d+' with separate 0s
+        part = re.sub(r"(\s+)0\*(\d+)(\s+)",
+                      lambda m: m.group(1) + (''.join(["0 "] * int(m.group(2)))) + m.group(3),
+                      part)
 
         return part
 
-    # Split the content into parts based on "NextPart", process each part and join them back together
-    parts = content.split("NextPart")
-    processed_parts = [process_part(part) for part in parts]
-    return "NextPart".join(processed_parts)
+    # Split and process content by "NextPart" and "NextScore"
+    parts = re.split(r"(NextPart|NextScore)", content)
+    processed_parts = []
+
+    # Process each part with its separator
+    for i in range(0, len(parts), 2):
+        processed_part = process_part(parts[i])
+        separator = ' ' + parts[i + 1] + ' ' if i + 1 < len(parts) else ""
+        processed_parts.append(processed_part + separator)
+
+    return "".join(processed_parts).replace("  ", " ")
 
 
 def getInput0(f, is_google_drive=False):
