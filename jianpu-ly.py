@@ -196,7 +196,7 @@ def all_scores_start():
     r += r"""
 
 % un-comment the next line to remove Lilypond tagline:
-\header { tagline=""}
+\header { tagline="" }
 
 \pointAndClickOff
 
@@ -210,9 +210,10 @@ def all_scores_start():
     \fill-line {
       \dir-column {
         \null
+        \left-align \fontsize #2 \bold \fromproperty #'header:keytimesignature
+        \left-align \fromproperty #'header:meter
         \null
         \left-align \fromproperty #'header:emotion
-        \left-align \fromproperty #'header:meter
       }
       \dir-column {
           \center-align \fontsize #6 \bold \fromproperty #'header:title
@@ -310,9 +311,11 @@ def score_end(**headers):
         # before the header block if it's per-score
         ret += r"\header{" + "\n"
         for k, v in headers.items():
-            if '"' not in v:
+            if '"' not in v and r'\markup' not in v:
                 v = '"' + v + '"'
             ret += k + "=" + v + "\n"
+        # Placeholder for key and time signatures
+        ret += r'keytimesignature=""' + "\n"
         ret += "}\n"
 
     if midi:
@@ -430,9 +433,13 @@ def jianpu_staff_start(inst=None, withStaff=False):
     """
 
     # Adding comments for ease of copy/pasting into other files
-    r = "\n%% === BEGIN NOT ANGKA STAFF ===\n" if not_angka else "\n%% === BEGIN JIANPU STAFF ===\n"
+    r = (
+        "\n%% === BEGIN NOT ANGKA STAFF ===\n"
+        if not_angka
+        else "\n%% === BEGIN JIANPU STAFF ===\n"
+    )
     r += r"\new RhythmicStaff \with {"
-    r += "\n    \\consists \"Accidental_engraver\" " if not not_angka else ""
+    r += '\n    \\consists "Accidental_engraver" ' if not not_angka else ""
 
     # Adding instrument name if provided
     if inst:
@@ -496,9 +503,12 @@ def midi_staff_start():
     This function generates the LilyPond code to start a new MIDI staff with a unique voice name.
     It includes a comment indicating the beginning of the MIDI staff section.
     """
-    return r"""
+    return (
+        r"""
 %% === BEGIN MIDI STAFF ===
-    \new Staff { \new Voice="%s" {""" % unique_name()
+    \new Staff { \new Voice="%s" {"""
+        % unique_name()
+    )
 
 
 def midi_staff_end():
@@ -536,13 +546,15 @@ def western_staff_start(inst=None):
         r += r'\with { instrumentName = "' + inst + '" } '
     voiceName = unique_name()
     return (
-        r + r"""{
+        r
+        + r"""{
     \override Score.SystemStartBar.collapse-height = #11 %% (needed on 2.22)
     \new Voice="%s" {
     #(set-accidental-style 'modern-cautionary)
     \override Staff.TimeSignature #'style = #'numbered
     \set Voice.chordChanges = ##f %% for 2.19.82 bug workaround
-""" % voiceName,
+"""
+        % voiceName,
         voiceName,
     )
 
@@ -573,7 +585,7 @@ def lyrics_start(voiceName):
     allowing for lyrics to be aligned with the notes of that voice.
     """
     uniqueName = unique_name()
-    return fr'\new Lyrics = "I{uniqueName}" {{ \lyricsto "{voiceName}" {{ '
+    return rf'\new Lyrics = "I{uniqueName}" {{ \lyricsto "{voiceName}" {{ '
 
 
 def lyrics_end():
@@ -637,8 +649,12 @@ def scoreError(msg, word, line):
     TRUNCATED_LINE_LENGTH = 500
 
     # Truncate 'word' and 'line' if they exceed maximum lengths
-    word = word if len(word) <= MAX_WORD_LENGTH else word[:TRUNCATED_WORD_LENGTH] + "..."
-    line = line if len(line) <= MAX_LINE_LENGTH else line[:TRUNCATED_LINE_LENGTH] + "..."
+    word = (
+        word if len(word) <= MAX_WORD_LENGTH else word[:TRUNCATED_WORD_LENGTH] + "..."
+    )
+    line = (
+        line if len(line) <= MAX_LINE_LENGTH else line[:TRUNCATED_LINE_LENGTH] + "..."
+    )
 
     # Check if the word is actually in the line
     if word in line:
@@ -733,6 +749,7 @@ class NoteheadMarkup:
     """
     A class that defines a notehead graphical object for the figures.
     """
+
     def __init__(self, withStaff=True):
         """
         Initializes the NoteheadMarkup object.
@@ -952,8 +969,14 @@ class NoteheadMarkup:
         self.notesHad.append(figures)
 
         # Process figures
-        name, placeholder_chord, figures, accidental, octave, invisTieLast = \
-            self._process_figures(figures, accidental, octave, word, line)
+        (
+            name,
+            placeholder_chord,
+            figures,
+            accidental,
+            octave,
+            invisTieLast,
+        ) = self._process_figures(figures, accidental, octave, word, line)
 
         if accidental not in ["", "#", "b"]:
             scoreError("Can't handle accidental " + accidental + " in", word, line)
@@ -1387,9 +1410,9 @@ def merge_lyrics(content):
         # Process each "H:" line individually
         def process_line(line):
             # Replace w*n pattern with n copies of w
-            line = re.sub(r"(.)\*(\d+)",
-                          lambda m: ''.join([m.group(1)] * int(m.group(2))),
-                          line)
+            line = re.sub(
+                r"(.)\*(\d+)", lambda m: "".join([m.group(1)] * int(m.group(2))), line
+            )
             # Ensure '_' is properly spaced
             line = re.sub(r"(?<!\s)_", " _", line)
             line = re.sub(r"_(?!\s)", "_ ", line)
@@ -1409,17 +1432,21 @@ def merge_lyrics(content):
             return merged_line
 
         replace_first_H.first_encountered = False
-        part = re.sub(r"^\s*H:.*$",
-                      lambda m: replace_first_H(m)
-                      if not replace_first_H.first_encountered
-                      else "",
-                      part,
-                      flags=re.MULTILINE)
+        part = re.sub(
+            r"^\s*H:.*$",
+            lambda m: replace_first_H(m)
+            if not replace_first_H.first_encountered
+            else "",
+            part,
+            flags=re.MULTILINE,
+        )
 
         # Also replace '0\*\d+' with separate 0s
-        part = re.sub(r"(\s+)0\*(\d+)(\s+)",
-                      lambda m: m.group(1) + (''.join(["0 "] * int(m.group(2)))) + m.group(3),
-                      part)
+        part = re.sub(
+            r"(\s+)0\*(\d+)(\s+)",
+            lambda m: m.group(1) + ("".join(["0 "] * int(m.group(2)))) + m.group(3),
+            part,
+        )
 
         return part
 
@@ -1430,7 +1457,7 @@ def merge_lyrics(content):
     # Process each part with its separator
     for i in range(0, len(parts), 2):
         processed_part = process_part(parts[i])
-        separator = ' ' + parts[i + 1] + ' ' if i + 1 < len(parts) else ""
+        separator = " " + parts[i + 1] + " " if i + 1 < len(parts) else ""
         processed_parts.append(processed_part + separator)
 
     return "".join(processed_parts).replace("  ", " ")
@@ -2145,8 +2172,10 @@ def process_grace_notes(
     else:
         if notehead_markup.tuplet != (1, 1):
             for i in range(1, 4):
-                if r'\times' in out[-i]:
-                    out[-i] = '\\once \\override TupletBracket.padding = #2.5 ' + out[-i]
+                if r"\times" in out[-i]:
+                    out[-i] = (
+                        "\\once \\override TupletBracket.padding = #2.5 " + out[-i]
+                    )
                     break
         # Handle the jianpu notation for grace note
         afternext = graceNotes_markup(gracenote_content, 0)
@@ -2217,8 +2246,10 @@ def process_grace_notes_after(
     else:
         if notehead_markup.tuplet != (1, 1):
             for i in range(1, 4):
-                if r'\times' in out[-i]:
-                    out[-i] = '\\once \\override TupletBracket.padding = #2.5 ' + out[-i]
+                if r"\times" in out[-i]:
+                    out[-i] = (
+                        "\\once \\override TupletBracket.padding = #2.5 " + out[-i]
+                    )
                     break
 
         # Handle grace notes for Jianpu notation:
@@ -2786,6 +2817,7 @@ def get_unicode_approx(inDat):
 try:
     from shlex import quote
 except ImportError:
+
     def quote(f):
         return "'" + f.replace("'", "'\"'\"'") + "'"
 
@@ -2939,23 +2971,19 @@ def reformat_key_time_signatures(s, with_staff):
             ]
         )
 
-        # Compute the dynamic spacing based on the length of the time signatures
-        if not with_staff:
-            hspace_value = 11 + (len(time_signatures) - 1) * 2
-        else:
-            hspace_value = 1
-
         omittimesig = r"\\omit Staff.TimeSignature" if len(time_signatures) == 1 else ""
 
         # Update key signature line in the original string
-        s = re.sub(
-            r"(\\mark \\markup\{)1=([♭♯]?[A-G])\}",
-            rf"\1\\hspace #{hspace_value} 1=\2 "
-            + time_signatures_str.replace("\\", "\\\\")
-            + "}"
-            + omittimesig,
-            s,
-            re.MULTILINE,
+        keysig = re.search(r"\\mark \\markup\{\s*([16]=[♭♯]?[A-G])\}", s).group(1)
+        s = re.sub(r"(\\mark \\markup\{)[16]=([♭♯]?[A-G])\}", omittimesig, s)
+
+        s = s.replace(
+            'keytimesignature=""',
+            r"keytimesignature=\markup{ \concat { "
+            + keysig
+            + " "
+            + time_signatures_str
+            + " } }"
         )
 
     return s
