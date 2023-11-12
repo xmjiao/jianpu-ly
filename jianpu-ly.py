@@ -1394,59 +1394,51 @@ def write_docs():
 
 def merge_lyrics(content):
     """
-    Merge lines starting with "H:(\s*\d+\.)" in each content part, separated
-    by "NextPart" or "NextScore". Replaces each group of "H:(\s*\d+\.)" lines
-    with a merged line, preserving the verse number. Patterns 'w*n' are
-    replaced with 'n' occurrences of 'w', ensuring '_' is spaced.
+    Merge lines starting with "H:(\s*\d+\.)" within each part of content,
+    separated by "NextPart" or "NextScore". Each group of "H:(\s*\d+\.)"
+    lines is replaced with a single merged line, removing the verse number.
+    Replaces 'w*n' patterns with 'n' occurrences of 'w' and spaces '_'.
 
     Args:
         content (str): Content with parts separated by "NextPart" or "NextScore".
 
     Returns:
-        str: Processed content with merged "H: \d+:" lines and preserved separators.
+        str: Content with merged "H: \d+:" lines, preserving separators.
     """
 
     def process_part(part):
         def process_line(line):
-            # Replace w*n pattern with n copies of w
-            line = re.sub(
-                r"(.)\*(\d+)", lambda m: "".join([m.group(1)] * int(m.group(2))), line
-            )
-            # Ensure '_' is properly spaced
+            # Replace 'w*n' pattern with n copies of w and space '_'
+            line = re.sub(r"(.)\*(\d+)", lambda m: "".join([m.group(1)] * int(m.group(2))), line)
             line = re.sub(r"(?<!\s)_", " _", line)
             line = re.sub(r"_(?!\s)", "_ ", line)
             return line
 
-        # Find all unique H:\s*\d+\. prefixes in order
+        # Extract unique H: \d+ prefixes in order
         prefixes = re.findall(r"H:\s*(\d+\.)?", part)
-
-        # Sort unique occurrences of prefixes in ascending order
-        prefixes = list(dict.fromkeys(prefixes))
+        prefixes = list(dict.fromkeys(prefixes))  # Remove duplicates
         prefixes.sort(key=lambda prefix: -1 if prefix == "" else int(prefix[:-1]))
 
         for prefix in prefixes:
-            # Extract and merge lines with the same prefix
+            # Merge lines with the same prefix
             label = rf"H:\s*{re.escape(prefix)}"
             h_lines = re.findall(rf"^\s*{label}(.*)$", part, re.MULTILINE)
             h_lines = [line.strip() for line in h_lines]
-            merged_line = "H:" + process_line(prefix + " " + " ".join(h_lines))
+            merged_line = "H:" + process_line(" ".join(h_lines))
 
             def replace_first_H(match):
                 replace_first_H.first_encountered = True
                 return merged_line + "\n"
 
-            # Replace first occurrence with merged line and remove others
             replace_first_H.first_encountered = False
             part = re.sub(
                 r"^\s*" + label + ".*(\n|$)",
-                lambda m: replace_first_H(m)
-                if not replace_first_H.first_encountered
-                else "",
+                lambda m: replace_first_H(m) if not replace_first_H.first_encountered else "",
                 part,
                 flags=re.MULTILINE,
             )
 
-        # Also replace '0\*\d+' with separate 0s within the part
+        # Replace '0*n' with separated 0s within the part
         part = re.sub(
             r"(\s+)0\*(\d+)(\s+)",
             lambda m: m.group(1) + ("".join(["0 "] * int(m.group(2)))) + m.group(3),
