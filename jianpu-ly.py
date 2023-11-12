@@ -1414,8 +1414,11 @@ def merge_lyrics(content):
             line = re.sub(r"_(?!\s)", "_ ", line)
             return line
 
+        # Standardize "H:" lines to "H:1."
+        part = re.sub(r"^\s*H:(?!\s*\d+\.)", "H:1.", part, flags=re.MULTILINE)
+
         # Extract unique H: \d+ prefixes in order
-        prefixes = re.findall(r"H:\s*(\d+\.)?", part)
+        prefixes = re.findall(r"^\s*H:\s*(\d+\.)?", part, flags=re.MULTILINE)
         prefixes = list(dict.fromkeys(prefixes))  # Remove duplicates
         prefixes.sort(key=lambda prefix: -1 if prefix == "" else int(prefix[:-1]))
 
@@ -1725,7 +1728,7 @@ def convert_ties_to_slurs(jianpu):
              following ties are handled properly, preserving their placement.
     """
     # Remove comments from the input
-    jianpu = re.sub(r"%.*$", "", jianpu, flags=re.MULTILINE).replace("|", "")
+    jianpu = re.sub(r"%.*$", "", jianpu, flags=re.MULTILINE)
 
     # Define the pattern to match the entire tied note sequence
     tied_note_sequence_pattern = r"(?<!\\)\([^()]*~[^()]*\)(?<!\\)"
@@ -1821,7 +1824,7 @@ def reformat_slurs(jianpu):
     correctness of the notation.
     """
     # Remove comments from the input
-    jianpu = re.sub(r"%.*$", "", jianpu, flags=re.MULTILINE).replace("|", "")
+    jianpu = re.sub(r"%.*$", "", jianpu, flags=re.MULTILINE)
 
     # Move opening and closing parenthesis after dashes
     return re.sub(
