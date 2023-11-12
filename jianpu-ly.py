@@ -73,7 +73,7 @@ Erhu fingering (applies to previous note): Fr=0 Fr=4
 Erhu symbol (applies to previous note): souyin harmonic up down bend tilde
 Tremolo: 1/// - 1///5 -
 Rehearsal letters: letterA letterB
-Multibar rest: R*8
+Multibar rest: R*8 0*32
 Dynamics (applies to previous note): \p \mp \f
 Other 1-word Lilypond \ commands: \fermata \> \! \( \) etc
 Text: ^"above note" _"below note"
