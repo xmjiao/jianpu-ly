@@ -3,6 +3,15 @@
 # jp2ly: Jianpu to LilyPond Converter with Jianpu and/or Staff Notation Output
 # v0.1 (c) 2023 Xiangmin Jiao <xmjiao@gmail.com>
 
+# Summary:
+# This script converts musical scores written in Jianpu (numbered musical notation)
+# into the LilyPond format. LilyPond is a music engraving system that can create
+# sheet music from text inputs. The script supports converting to traditional Western
+# staff notation as well as including lyrics, time signatures, key signatures, and other
+# musical symbols. It also provides features for rendering the output as a LilyPond file (.ly),
+# HTML document, or Markdown file. Additionally, it can handle input from Google Drive when
+# given a file ID.
+
 # Forked and expanded from 'Jianpu (numbered musical notation) for Lilypond'
 # originally created by Silas S. Brown, v1.731 (c) 2012-2023 Silas S. Brown.
 
@@ -86,6 +95,7 @@ import sys
 import os
 import re
 import shutil
+import tempfile
 import argparse
 import requests
 import subprocess
@@ -2774,7 +2784,7 @@ def process_input(inDat, withStaff=False):
                     if partNo == len(parts) - 1 or separate_scores:
                         ret.append(score_end(**headers))
     ret = "".join(r + "\n" for r in ret)
-    ret = re.sub(r'([\^_])"([^"]+)"', r"\1\2", ret)
+    ret = re.sub(r'([\^_])"(\\[^"]+)"', r"\1\2", ret)
 
     if lilypond_minor_version() >= 24:
         # needed to avoid deprecation warnings on Lilypond 2.24
@@ -2856,7 +2866,6 @@ For Unicode approximation on this system, please do one of these things:
                 if os.extsep in fn:
                     fn = fn[: -fn.rindex(os.extsep)]
                 fn += ".ly"
-                import tempfile
 
                 cwd = os.getcwd()
                 os.chdir(tempfile.gettempdir())
@@ -3158,34 +3167,31 @@ def set_output_file(args, input_text):
     return args
 
 
-def convert_midi_to_mp3(base_name, with_metronome):
+def convert_midi_to_mp3(base_name, with_metronome, normalize=True):
     """
     Converts a MIDI file to an MP3 file using either 'mscore', 'musescore', or 'timidity' with 'lame'.
     If 'with_metronome' is True, uses either 'mscore' or 'musescore' to include a metronome in the output.
     Otherwise, uses 'timidity' with 'lame' to convert the MIDI file to MP3.
+    Optionally normalizes the volume of the output file.
 
     Args:
         base_name (str): The base name of the MIDI file (without the '.midi' extension).
         with_metronome (bool): Whether to include a metronome in the output.
+        normalize (bool): Whether to normalize the volume of the output MP3.
 
     Returns:
         None
     """
 
-    # Check if 'mscore' or 'musescore' exists
     command = None
 
     if with_metronome and shutil.which("mscore"):
-        # use mscore
         command = f"mscore -o {base_name}.mp3 {base_name}.midi"
     elif with_metronome and shutil.which("musescore"):
-        # use musescore
         command = f"musescore -o {base_name}.mp3 {base_name}.midi"
     else:
-        # fallback to timidity
         command = f"timidity {base_name}.midi -Ow -o - | lame - -b 192 {base_name}.mp3"
 
-    # execute the command
     process = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
     output, error = process.communicate()
 
@@ -3193,6 +3199,59 @@ def convert_midi_to_mp3(base_name, with_metronome):
         print(f"Error: {error}")
     else:
         print(f"Output: {output}")
+
+    if normalize:
+        normalize_volume(f"{base_name}.mp3")
+
+
+def normalize_volume(filename, inplace=True):
+    """
+    Normalizes the volume of an MP3 file.
+
+    This function first tries to use the pydub library for normalization.
+    If pydub is not available, it falls back to using ffmpeg. It calculates
+    the change in dBFS needed to normalize the volume and applies this gain
+    to the audio.
+
+    Args:
+        filename (str): The path to the MP3 file to be normalized.
+        inplace (bool): If True, the original file is overwritten.
+                        Otherwise, a new file is created.
+
+    Returns:
+        None: The function modifies the file directly and does not return anything.
+    """
+    try:
+        # Try to import pydub and use it for normalization
+        from pydub import AudioSegment
+
+        audio = AudioSegment.from_file(filename, format="mp3")
+        change_in_dBFS = -audio.max_dBFS
+        normalized_audio = audio.apply_gain(change_in_dBFS)
+
+        if not inplace:
+            filename = 'normalized_' + filename
+        normalized_audio.export(filename, format="mp3")
+
+    except ImportError:
+        # pydub is not available, use ffmpeg instead
+        cmd_detect_volume = f"ffmpeg -i {filename} -af volumedetect -f null /dev/null"
+        result = subprocess.run(cmd_detect_volume, capture_output=True, text=True, shell=True)
+        max_volume_line = [line for line in result.stderr.split('\n') if "max_volume" in line]
+        if max_volume_line:
+            max_volume = max_volume_line[0].split(':')[1].strip().replace(' dB', '')
+            volume_adjustment = str(-float(max_volume))
+
+            # Create a unique temporary file
+            with tempfile.NamedTemporaryFile(delete=True, suffix='.mp3') as temp_file:
+                temp_filename = temp_file.name
+
+            cmd_normalize_volume = f"ffmpeg -i {filename} -af volume={volume_adjustment}dB {temp_filename}"
+            subprocess.run(cmd_normalize_volume, shell=True)
+
+            # Move the temp file to overwrite the original file if inplace is True
+            if inplace:
+                shutil.move(temp_filename, filename)
 
 
 def main():
