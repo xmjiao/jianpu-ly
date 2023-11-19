@@ -44,7 +44,7 @@ from pdf2image import convert_from_path
 import shutil
 from google.colab import drive
 
-def convert_pdf_to_images_and_play_audio():
+def convert_pdf_to_images():
     # Find the first .ly file in the current directory
     ly_files = glob.glob("./*.ly")
     if not ly_files:
@@ -61,21 +61,9 @@ def convert_pdf_to_images_and_play_audio():
     for img in images:
         display(img)
 
-    # Play the audio file
-    Audio(f'{base_name}.mp3', autoplay=True)
+    return base_name
 
-def copy_files_to_drive(dest_dir):
-    # Find the first .ly file in the current directory
-    ly_files = glob.glob("./*.ly")
-    if not ly_files:
-        raise FileNotFoundError("No .ly files found in the current directory.")
-
-    # Get path of the first .ly file
-    ly_path = ly_files[0]
-
-    # Extract basename without extension
-    base_name = os.path.splitext(os.path.basename(ly_path))[0]
-
+def copy_files_to_gdrive(base_name, dest_dir):
     # Check if destination directory exists, create if it doesn't
     if not os.path.exists(dest_dir):
         os.makedirs(dest_dir)
