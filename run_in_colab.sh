@@ -18,6 +18,14 @@ install_packages() {
     sudo chmod a+x /usr/local/bin/mscore
 }
 
+# Create MuseScore configuration file
+mkdir -p ~/.config/MuseScore
+cat > ~/.config/MuseScore/MuseScore4.ini << 'EOF'
+[application]
+[application.playback]
+metronomeEnabled=true
+EOF
+
 # Create the Python module
 cat > colab_utils.py << 'EOF'
 import glob
