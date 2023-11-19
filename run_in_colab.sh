@@ -39,7 +39,6 @@ MODULE_NAME="colab_utils.py"
 cat > $MODULE_NAME << 'EOF'
 import glob
 import os
-from IPython.display import display, Audio
 from pdf2image import convert_from_path
 import shutil
 from google.colab import drive
@@ -58,10 +57,8 @@ def convert_pdf_to_images():
 
     # Convert the PDF file into images
     images = convert_from_path(f'{base_name}.pdf')
-    for img in images:
-        display(img)
 
-    return base_name
+    return images,base_name
 
 def copy_files_to_gdrive(base_name, dest_dir):
     # Check if destination directory exists, create if it doesn't
