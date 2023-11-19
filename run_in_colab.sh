@@ -18,22 +18,6 @@ install_packages() {
     sudo chmod a+x /usr/local/bin/mscore
 }
 
-# Check if mscore is installed
-if ! command -v mscore &> /dev/null; then
-    echo 'Installing necessary packages...'
-    install_packages
-    echo 'Done'
-fi
-
-# Download the jianpu-ly.py script
-wget -q -O jianpu-ly.py https://raw.githubusercontent.com/xmjiao/jianpu-ly/master/jianpu-ly.py
-
-# Remove existing .ly files
-rm -f *.ly
-
-# Run the script to obtain the PDF, MIDI, and MP3 files
-QT_QPA_PLATFORM=offscreen python ./jianpu-ly.py -b 1 -M -g ${FILEID}
-
 # Create the Python module
 cat > colab_utils.py << 'EOF'
 import glob
@@ -57,7 +41,7 @@ def convert_pdf_to_images():
     # Convert the PDF file into images
     images = convert_from_path(f'{base_name}.pdf')
 
-    return images,base_name
+    return images, base_name
 
 def copy_files_to_gdrive(base_name, dest_dir):
     # Check if destination directory exists, create if it doesn't
@@ -77,3 +61,19 @@ def copy_files_to_gdrive(base_name, dest_dir):
 def mount_google_drive():
     drive.mount('/content/drive', force_remount=True)
 EOF
+
+# Check if mscore is installed
+if ! command -v mscore &> /dev/null; then
+    echo 'Installing necessary packages...'
+    install_packages
+    echo 'Done'
+fi
+
+# Download the jianpu-ly.py script
+wget -q -O jianpu-ly.py https://raw.githubusercontent.com/xmjiao/jianpu-ly/master/jianpu-ly.py
+
+# Remove existing .ly files
+rm -f *.ly
+
+# Run the script to obtain the PDF, MIDI, and MP3 files
+QT_QPA_PLATFORM=offscreen python ./jianpu-ly.py -b 1 -M -g ${FILEID}
