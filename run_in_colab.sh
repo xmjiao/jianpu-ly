@@ -35,8 +35,7 @@ rm -f *.ly
 QT_QPA_PLATFORM=offscreen python ./jianpu-ly.py -b 1 -M -g ${FILEID}
 
 # Create the Python module
-MODULE_NAME="colab_utils.py"
-cat > $MODULE_NAME << 'EOF'
+cat > colab_utils.py << 'EOF'
 import glob
 import os
 from pdf2image import convert_from_path
