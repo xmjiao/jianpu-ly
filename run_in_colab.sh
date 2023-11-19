@@ -16,36 +16,6 @@ install_packages() {
     wget -q https://github.com/musescore/MuseScore/releases/download/v4.1.1/MuseScore-4.1.1.232071203-x86_64.AppImage
     sudo mv MuseScore-4.1.1.232071203-x86_64.AppImage /usr/local/bin/mscore
     sudo chmod a+x /usr/local/bin/mscore
-
-    # Create the Python module
-    MODULE_NAME="colab_utils.py"
-    cat > $MODULE_NAME << 'EOF'
-import os
-import shutil
-import glob
-from google.colab import drive
-from IPython.display import display
-from pdf2image import convert_from_path
-
-def convert_pdf_to_images(pdf_file):
-    images = convert_from_path(pdf_file)
-    for img in images:
-        display(img)
-
-def copy_files_to_drive(base_name, dest_dir):
-    files_to_copy = [f'{base_name}.pdf', f'{base_name}.midi', f'{base_name}.mp3']
-    for file in files_to_copy:
-        src_file = os.path.join('.', file)
-        dest_file = os.path.join(dest_dir, file)
-        shutil.copy(src_file, dest_file)
-    print(f'Files copied to Google Drive directory: {dest_dir}')
-
-def mount_google_drive():
-    drive.mount('/content/drive', force_remount=True)
-EOF
-
-    # Notify the user
-    echo "The script has completed its tasks. A Python module '$MODULE_NAME' has been created for further processing."
 }
 
 # Check if mscore is installed
@@ -63,3 +33,63 @@ rm -f *.ly
 
 # Run the script to obtain the PDF, MIDI, and MP3 files
 QT_QPA_PLATFORM=offscreen python ./jianpu-ly.py -b 1 -M -g ${FILEID}
+
+# Create the Python module
+MODULE_NAME="colab_utils.py"
+cat > $MODULE_NAME << 'EOF'
+import glob
+import os
+from IPython.display import display, Audio
+from pdf2image import convert_from_path
+import shutil
+from google.colab import drive
+
+def convert_pdf_to_images_and_play_audio():
+    # Find the first .ly file in the current directory
+    ly_files = glob.glob("./*.ly")
+    if not ly_files:
+        raise FileNotFoundError("No .ly files found in the current directory.")
+
+    # Get path of the first .ly file
+    ly_path = ly_files[0]
+
+    # Extract basename without extension
+    base_name = os.path.splitext(os.path.basename(ly_path))[0]
+
+    # Convert the PDF file into images
+    images = convert_from_path(f'{base_name}.pdf')
+    for img in images:
+        display(img)
+
+    # Play the audio file
+    Audio(f'{base_name}.mp3', autoplay=True)
+
+def copy_files_to_drive(dest_dir):
+    # Find the first .ly file in the current directory
+    ly_files = glob.glob("./*.ly")
+    if not ly_files:
+        raise FileNotFoundError("No .ly files found in the current directory.")
+
+    # Get path of the first .ly file
+    ly_path = ly_files[0]
+
+    # Extract basename without extension
+    base_name = os.path.splitext(os.path.basename(ly_path))[0]
+
+    # Check if destination directory exists, create if it doesn't
+    if not os.path.exists(dest_dir):
+        os.makedirs(dest_dir)
+
+    # Construct the source and destination file paths for the PDF, MIDI, and MP3 files and copy them
+    for ext in ['.pdf', '.midi', '.mp3']:
+        file = f'{base_name}{ext}'
+        src_file = os.path.join('.', file)
+        dest_file = os.path.join(dest_dir, file)
+        shutil.copy(src_file, dest_file)
+        print(f'File "{file}" has been copied to "{dest_dir}" in Google Drive.')
+
+    print('Go to https://drive.google.com/drive/my-drive and navigate to the `tmp` folder to access the files.')
+
+def mount_google_drive():
+    drive.mount('/content/drive', force_remount=True)
+EOF
