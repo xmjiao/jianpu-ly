@@ -186,13 +186,13 @@ def lilypond_command():
     return None
 
 
-def all_scores_start():
+def all_scores_start(poet1st, hasarranger):
     """
     Returns a string containing the Lilypond code for setting up the score.
     The code includes settings for staff size, paper size, margins, fonts, and spacing.
+    :param poet1st: bool, if True, 'header:poet' appears before 'header:composer', otherwise the order is reversed.
     :return: str
     """
-
     staff_size = float(os.environ.get("j2ly_staff_size", 20))
     # Normal: j2ly_staff_size=20
     # Large: j2ly_staff_size=25.2
@@ -203,6 +203,17 @@ def all_scores_start():
 #(set-global-staff-size %g)"""
         % staff_size
     )
+
+    # Modify the headers section based on poet1st argument
+    headers_poet_composer = (
+        r"\right-align \fromproperty #'header:poet" "\n"
+        r"\right-align \fromproperty #'header:composer" "\n"
+    ) if poet1st else (
+        r"\right-align \fromproperty #'header:composer" "\n"
+        r"\right-align \fromproperty #'header:poet" "\n"
+    )
+
+    nullrow = '\n' if hasarranger else '\null\n'
     r += r"""
 
 % un-comment the next line to remove Lilypond tagline:
@@ -232,9 +243,7 @@ def all_scores_start():
           \center-align \fromproperty #'header:piece
       }
       \dir-column {
-          \null
-          \right-align \fromproperty #'header:poet
-          \right-align \fromproperty #'header:composer
+          """ + nullrow + headers_poet_composer + r"""
           \right-align \fromproperty #'header:arranger
       }
     }
@@ -274,9 +283,9 @@ def all_scores_start():
         r += r"""
   % Might need to enforce a minimum spacing between systems, especially if lyrics are
   % below the last staff in a system and numbers are on the top of the next
-  system-system-spacing = #'((basic-distance . 7) (padding . 4) (stretchability . 1e7))
-  score-markup-spacing = #'((basic-distance . 9) (padding . 4) (stretchability . 1e7))
-  score-system-spacing = #'((basic-distance . 9) (padding . 4) (stretchability . 1e7))
+  system-system-spacing = #'((basic-distance . 7) (padding . 3) (stretchability . 1e7))
+  score-markup-spacing = #'((basic-distance . 9) (padding . 3) (stretchability . 1e7))
+  score-system-spacing = #'((basic-distance . 9) (padding . 3) (stretchability . 1e7))
   markup-system-spacing = #'((basic-distance . 2) (padding . 2) (stretchability . 0))
 """
     r += "}\n"  # end of \paper block
@@ -2714,6 +2723,9 @@ def process_input(inDat, withStaff=False):
     notehead_markup = NoteheadMarkup(withStaff)
     scoreNo = 0  # incr'd to 1 below
     western = False
+    poet1st = not re.search(r"^\s*poet=[^\n]+填词", inDat, re.M)
+    hasarranger = re.search(r"^\s*arranger=", inDat, re.M)
+
     for score in re.split(r"\sNextScore\s", " " + inDat + " "):
         if not score.strip():
             continue
@@ -2725,7 +2737,7 @@ def process_input(inDat, withStaff=False):
             not_angka = False  # may be set by getLY
             if scoreNo == 1 and not midi:
                 # now we've established non-empty
-                ret.append(all_scores_start())
+                ret.append(all_scores_start(poet1st, hasarranger))
             # TODO: document this (results in 1st MIDI file containing all parts, then each MIDI file containing one part, if there's more than 1 part)
             separate_score_per_part = (
                 midi
