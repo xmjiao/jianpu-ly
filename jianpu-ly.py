@@ -110,6 +110,7 @@ unichr, xrange = chr, range
 # Control options
 bar_number_every = 1
 midiInstrument = "choir aahs"  # see  https://lilypond.org/doc/v2.24/Documentation/notation/midi-instruments
+padding = 3
 
 
 def as_unicode(input_string):
@@ -280,12 +281,13 @@ def all_scores_start(poet1st, hasarranger):
     ))
 """
     if has_lyrics:
-        r += r"""
+        global padding
+        r += fr"""
   % Might need to enforce a minimum spacing between systems, especially if lyrics are
   % below the last staff in a system and numbers are on the top of the next
-  system-system-spacing = #'((basic-distance . 7) (padding . 3) (stretchability . 1e7))
-  score-markup-spacing = #'((basic-distance . 9) (padding . 3) (stretchability . 1e7))
-  score-system-spacing = #'((basic-distance . 9) (padding . 3) (stretchability . 1e7))
+  system-system-spacing = #'((basic-distance . 7) (padding . {padding}) (stretchability . 1e7))
+  score-markup-spacing = #'((basic-distance . 9) (padding . {padding}) (stretchability . 1e7))
+  score-system-spacing = #'((basic-distance . 9) (padding . {padding}) (stretchability . 1e7))
   markup-system-spacing = #'((basic-distance . 2) (padding . 2) (stretchability . 0))
 """
     r += "}\n"  # end of \paper block
@@ -3091,6 +3093,15 @@ def parse_arguments():
         default="",
         help="instrument to be used with MIDI",
     )
+
+    parser.add_argument(
+        "-p",
+        "--padding",
+        type=int,
+        default=0,
+        help="specify the spacing or padding between lines, defaults to 3"
+    )
+
     parser.add_argument(
         "-M",
         "--metronome",
@@ -3098,6 +3109,7 @@ def parse_arguments():
         default=False,
         help="Whether to enable metronome in the mp3 file",
     )
+
     parser.add_argument(
         "-g",
         "--google-drive",
@@ -3116,9 +3128,12 @@ def parse_arguments():
 
     args = parser.parse_args()
 
-    global bar_number_every, midiInstrument
+    global bar_number_every, midiInstrument, padding
 
     bar_number_every = args.bar_number_every
+
+    if args.padding:
+        padding = args.padding
 
     if args.instrument:
         midiInstrument = args.instrument
