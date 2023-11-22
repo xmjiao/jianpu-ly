@@ -276,9 +276,9 @@ def all_scores_start(poet1st, hasarranger):
         r += r"""
   #(define fonts
     (set-global-fonts
-     #:roman "Arimo"
-     #:sans "Arimo"
-     #:typewriter "Arimo"
+     #:roman "WenQuanYi Zen Hei"
+     #:sans "WenQuanYi Zen Hei"
+     #:typewriter "WenQuanYi Zen Hei"
      #:factor (/ staff-height pt 20)
     ))
 """
