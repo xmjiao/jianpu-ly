@@ -262,9 +262,7 @@ def all_scores_start(poet1st, hasarranger):
   right-margin = 25\mm
 """
     if (
-        os.path.exists("/Library/Fonts/Arial Unicode.ttf")
-        and lilypond_minor_version() >= 20 or
-        lilypond_minor_version() >= 24
+        lilypond_minor_version() >= 20
     ):
         r += r"""
   #(define fonts
