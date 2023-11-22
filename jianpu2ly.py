@@ -263,17 +263,10 @@ def all_scores_start(poet1st, hasarranger):
 """
     if (
         os.path.exists("/Library/Fonts/Arial Unicode.ttf")
-        and lilypond_minor_version() >= 20
+        and lilypond_minor_version() >= 20 or
+        lilypond_minor_version() >= 24
     ):
         r += r"""
-  % As jianpu-ly was run on a Mac, we include a Mac fonts workaround.
-  % The Mac version of Lilypond 2.18 used Arial Unicode MS as a
-  % fallback even in the Serif font, but 2.20 drops this in Serif
-  % (using it only in Sans), which means any Serif text (titles,
-  % lyrics etc) that includes Chinese will likely fall back to
-  % Japanese fonts which don't support all Simplified hanzi.
-  % This brings back 2.18's behaviour on 2.20+
-  % (you might have to comment it out to run this on 2.18)
   #(define fonts
     (set-global-fonts
      #:roman "Times New Roman,Arial Unicode MS"
