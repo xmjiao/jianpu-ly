@@ -1,12 +1,10 @@
 #!/bin/bash
 
 # Check for required arguments
-if [ "$#" -ne 1 ]; then
-    echo "Usage: $0 FILE_ID"
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 [OPTIONS]... FILE_ID"
     exit 1
 fi
-
-FILEID=$1
 
 # Function to install necessary packages
 install_packages() {
@@ -77,11 +75,11 @@ if ! command -v mscore &> /dev/null; then
     echo 'Done'
 fi
 
-# Download the jianpu-ly.py script
-wget -q -O jianpu-ly.py https://raw.githubusercontent.com/xmjiao/jianpu-ly/master/jianpu-ly.py
+# Download the jianpu2ly.py script
+wget -q -O jianpu2ly.py https://raw.githubusercontent.com/xmjiao/jianpu2ly/master/jianpu2ly.py
 
 # Remove existing .ly files
 rm -f *.ly
 
 # Run the script to obtain the PDF, MIDI, and MP3 files
-QT_QPA_PLATFORM=offscreen python ./jianpu-ly.py -b 1 -M -g ${FILEID}
+QT_QPA_PLATFORM=offscreen python ./jianpu2ly.py -M -g "$@"
