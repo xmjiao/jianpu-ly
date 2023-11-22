@@ -262,7 +262,8 @@ def all_scores_start(poet1st, hasarranger):
   right-margin = 25\mm
 """
     if (
-        lilypond_minor_version() >= 20
+        os.path.exists("/Library/Fonts/Arial Unicode.ttf")
+        and lilypond_minor_version() >= 20
     ):
         r += r"""
   #(define fonts
@@ -271,6 +272,17 @@ def all_scores_start(poet1st, hasarranger):
      #:factor (/ staff-height pt 20)
     ))
 """
+    elif lilypond_minor_version() >= 24:
+        r += r"""
+  #(define fonts
+    (set-global-fonts
+     #:roman "Noto Sans CJK"
+     #:sans "Noto Sans CJK"
+     #:typewriter "Noto Sans Mono CJK"
+     #:factor (/ staff-height pt 20)
+    ))
+"""
+
     if has_lyrics:
         global padding
         r += fr"""
