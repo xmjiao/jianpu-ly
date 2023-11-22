@@ -9,8 +9,10 @@ fi
 # Function to install necessary packages
 install_packages() {
     sudo apt-get -q -y update > /dev/null 2>&1
-    sudo apt-get -q -y install lilypond poppler-utils timidity lame fonts-dejavu > /dev/null 2>&1
+    sudo apt-get -q -y install poppler-utils timidity lame fonts-dejavu > /dev/null 2>&1
     pip install -q pdf2image pydub
+    wget -q -O - https://gitlab.com/lilypond/lilypond/-/releases/v2.24.3/downloads/lilypond-2.24.3-linux-x86_64.tar.gz | \
+        sudo tar -f - -xz -C /usr/local --strip-components=1
     wget -q https://github.com/musescore/MuseScore/releases/download/v4.1.1/MuseScore-4.1.1.232071203-x86_64.AppImage
     sudo mv MuseScore-4.1.1.232071203-x86_64.AppImage /usr/local/bin/mscore
     sudo chmod a+x /usr/local/bin/mscore
