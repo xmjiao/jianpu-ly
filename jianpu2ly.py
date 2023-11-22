@@ -310,7 +310,7 @@ def score_start():
     ret += r"<< "
     if not notehead_markup.noBarNums and not midi:
         ret += (
-            "\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n\\override Score.BarNumber #'Y-offset = #1\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible %d)"
+            "\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible %d)"
             % bar_number_every
         )
     return ret
