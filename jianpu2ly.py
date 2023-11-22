@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# jp2ly: Jianpu to LilyPond Converter with Jianpu and/or Staff Notation Output
+# jianpu2ly: Jianpu to LilyPond Converter with Jianpu and/or Staff Notation Output
 # v0.1 (c) 2023 Xiangmin Jiao <xmjiao@gmail.com>
 
 # Summary:
@@ -15,7 +15,7 @@
 # Forked and expanded from 'Jianpu (numbered musical notation) for Lilypond'
 # originally created by Silas S. Brown, v1.731 (c) 2012-2023 Silas S. Brown.
 
-# jp2ly extends the original work by enabling the generation of both Jianpu and
+# jianpu2ly extends the original work by enabling the generation of both Jianpu and
 # standard Western staff notations, with more standard handling of ties and
 # slurs in Jianpu. The core functionality has been refactored to enhance
 # readability and expand capabilities.
@@ -32,8 +32,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Homepage for jp2ly: https://github.com/xmjiao/jp2ly
-# Git repository for jp2ly: https://github.com/xmjiao/jp2ly
+# Homepage for jianpu2ly: https://github.com/xmjiao/jianpu2ly
+# Git repository for jianpu2ly: https://github.com/xmjiao/jianpu2ly
 
 # For detailed usage and documentation, refer to the provided instructions below.
 
