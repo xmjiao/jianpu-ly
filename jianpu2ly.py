@@ -276,9 +276,9 @@ def all_scores_start(poet1st, hasarranger):
         r += r"""
   #(define fonts
     (set-global-fonts
-     #:roman "Noto Sans CJK"
-     #:sans "Noto Sans CJK"
-     #:typewriter "Noto Sans Mono CJK"
+     #:roman "Arimo"
+     #:sans "Arimo"
+     #:typewriter "Arimo"
      #:factor (/ staff-height pt 20)
     ))
 """
