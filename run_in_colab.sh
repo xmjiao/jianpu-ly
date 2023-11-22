@@ -9,7 +9,7 @@ fi
 # Function to install necessary packages
 install_packages() {
     sudo apt-get -q -y update > /dev/null 2>&1
-    sudo apt-get -q -y install lilypond poppler-utils timidity lame > /dev/null 2>&1
+    sudo apt-get -q -y install lilypond poppler-utils timidity lame fonts-dejavu > /dev/null 2>&1
     pip install -q pdf2image pydub
     wget -q https://github.com/musescore/MuseScore/releases/download/v4.1.1/MuseScore-4.1.1.232071203-x86_64.AppImage
     sudo mv MuseScore-4.1.1.232071203-x86_64.AppImage /usr/local/bin/mscore
