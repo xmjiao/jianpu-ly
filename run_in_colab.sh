@@ -9,7 +9,8 @@ fi
 # Function to install necessary packages
 install_packages() {
     sudo apt-get -q -y update > /dev/null 2>&1
-    sudo apt-get -q -y install poppler-utils timidity lame fonts-noto-cjk > /dev/null 2>&1
+    echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
+    sudo apt-get -q -y install poppler-utils timidity lame ttf-mscorefonts-installer fonts-noto-cjk > /dev/null 2>&1
     pip install -q pdf2image pydub
     wget -q -O - https://gitlab.com/lilypond/lilypond/-/releases/v2.24.3/downloads/lilypond-2.24.3-linux-x86_64.tar.gz | \
         sudo tar -f - -xz -C /usr/local --strip-components=1
