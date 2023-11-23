@@ -11,6 +11,9 @@ install_packages() {
     sudo apt-get -q -y update > /dev/null 2>&1
     echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
     sudo apt-get -q -y install poppler-utils timidity lame ttf-mscorefonts-installer fonts-noto-cjk > /dev/null 2>&1
+    wget -O /tmp/arial-unicode-ms.zip "https://cofonts.com/download/Arial-Unicode-MS-Font" && \
+    sudo unzip -o /tmp/arial-unicode-ms.zip -d /usr/share/fonts/truetype && \
+    sudo fc-cache -fv && rm -f /tmp/arial-unicode-ms.zip
     pip install -q pdf2image pydub
     wget -q -O - https://gitlab.com/lilypond/lilypond/-/releases/v2.24.3/downloads/lilypond-2.24.3-linux-x86_64.tar.gz | \
         sudo tar -f - -xz -C /usr/local --strip-components=1
