@@ -114,4 +114,4 @@ wget -q -O jianpu2ly.py https://raw.githubusercontent.com/xmjiao/jianpu2ly/maste
 rm -f *.ly
 
 # Run the script to obtain the PDF, MIDI, and MP3 files
-QT_QPA_PLATFORM=offscreen python ./jianpu2ly.py -M -g "$@"
+QT_QPA_PLATFORM=offscreen XDG_RUNTIME_DIR=/tmp/runtime-root python ./jianpu2ly.py -M -g "$@"
