@@ -28,9 +28,32 @@ install_packages() {
 # Create MuseScore configuration file
 mkdir -p ~/.config/MuseScore
 cat > ~/.config/MuseScore/MuseScore4.ini << 'EOF'
+[CourtesyAccidentalPlugin]
+typeDoubleBar=true
+typeEndScore=true
+typeEvent=false
+typeFullRest=true
+typeNextMeasure=true
+typeNumMeasures=false
+typeRehearsalM=false
+valueDodecaphonic=false
+valueNumMeasure=2
+valueUseBracket=false
+
+[QQControlsFileDialog]
+favoriteFolders=@Invalid()
+height=0
+sidebarSplit=118.575
+sidebarVisible=true
+sidebarWidth=80
+width=0
+
 [application]
-[application.playback]
-metronomeEnabled=true
+hasCompletedFirstLaunchSetup=true
+playback\metronomeEnabled=true
+
+[cloud]
+clientId=47791bbffff542ffa0633b4990458e7a
 EOF
 
 # Create the Python module
