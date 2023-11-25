@@ -3297,9 +3297,38 @@ def main():
     if args.staff_only:
         out = filter_out_jianpu(out)
 
+    if re.search(r"春\s*节\s*序\s*曲", out):
+        print('WARNING: Fixing "春节序曲".')
+        out = workaround_text(out)
+
     write_output(out, args.output_file, args.input_file)
     if args.google_drive:
         convert_midi_to_mp3(args.title, args.metronome)
+
+
+def workaround_text(original_text):
+    # Text to be replaced
+    old_text = """
+    #:line (#:bold "1")
+    #:line (#:bold "3")
+"""
+
+    # New text to be inserted
+    new_text = """
+    #:line (
+      #:combine
+        (#:bold "1")
+        (#:translate (cons 0.25 1.8) #:bold ".")
+    )
+    #:vspace 0.2
+    #:line (#:bold "3")
+"""
+
+    # Replace the old text with the new text
+    modified_text = original_text.replace(old_text, new_text)
+
+    modified_text = modified_text.replace("< c' e'' >", "< c'' e'' >")
+    return modified_text
 
 
 if __name__ == "__main__":
