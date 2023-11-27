@@ -94,7 +94,7 @@ def copy_files_to_gdrive(base_name, dest_dir):
         shutil.copy(src_file, dest_file)
         print(f'File "{file}" has been copied to "{dest_dir}" in Google Drive.')
 
-    print(f'Go to https://drive.google.com/drive/my-drive/ {dest_dir.replace("/content/drive/MyDrive/", ""} to access the files.')
+    print(f'Go to https://drive.google.com/drive/my-drive/{dest_dir.replace("/content/drive/MyDrive/", "")} to access the files.')
 
 def mount_google_drive():
     drive.mount('/content/drive', force_remount=True)
