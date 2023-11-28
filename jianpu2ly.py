@@ -38,7 +38,7 @@
 # For detailed usage and documentation, refer to the provided instructions below.
 
 # (The following doc string's format is fixed, see --html)
-r"""Run jianpu-ly < text-file > ly-file (or jianpu-ly text-files > ly-file)
+r"""Run jianpu2ly text-file
 Text files are whitespace-separated and can contain:
 Scale going up: 1 2 3 4 5 6 7 1'
 Accidentals: 1 #1 2 b2 1
@@ -75,6 +75,7 @@ Grace notes after: 1 ['1]g
 Simple chords: 135 1 13 1
 Da capo: 1 1 Fine 1 1 1 1 1 1 DC
 Repeat (with alternate endings): R{ 1 1 1 } A{ 2 | 3 }
+Repeat twice (with alternate endings) twice: R3{ 1 1 1 } A{ 2 | 3 | 4 }
 Short repeats (percent): R4{ 1 2 }
 Ties (like Lilypond's, if you don't want dashes): 1 ~ 1
 Slurs (like Lilypond's): 1 ( 2 )
@@ -2580,9 +2581,10 @@ def getLY(score, headers=None, midi=True):
                     pass
                 elif word == "PartMidi":
                     pass  # handled in process_input
-                elif word == "R{":
+                elif word[0] == "R" and word[-1] == "{":  # word == "R{" or "R2{"
+                    n = int(word[1:-1]) if len(word) > 2 else 2
                     repeatStack.append((1, 0, 0))
-                    out.append(r"\repeat volta 2 {")
+                    out.append(rf"\repeat volta {n} {{")
                 elif re.match("R[1-9][0-9]*{$", word):
                     times = int(word[1:-1])
                     repeatStack.append((1, notehead_markup.barPos, times - 1))
