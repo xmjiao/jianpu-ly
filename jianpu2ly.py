@@ -1191,36 +1191,13 @@ class NoteheadMarkup:
                     octave
                 ]  # for MIDI + Western, put it so no-mark starts near middle C
         ret += ("%d" % length) + dots
+
         if tremolo:
-            if lilypond_minor_version() < 20:
-                errExit(
-                    "tremolo requires Lilypond 2.20+, we found 2."
-                    + str(lilypond_minor_version())
-                )
-            if midi or western:
-                if (
-                    placeholder_chord.startswith("<")
-                    and len(placeholder_chord.split()) == 4
-                ):
-                    previous, n1, n2, gtLenDot = ret.rsplit(None, 3)
-                    previous = previous[:-1]  # drop <
-                    ret = r"%s\repeat tremolo %d { %s32 %s32 }" % (
-                        previous,
-                        int(toAdd_preTuplet / 4),
-                        n1,
-                        n2,
-                    )
-                else:
-                    ret += tremolo
-            elif lilypond_minor_version() >= 22:
-                if dots:
-                    ret += r"""_\tweak outside-staff-priority ##f ^\tweak avoid-slur #'inside _\markup {\with-dimensions #'(0 . 0) #'(2.8 . 2.1) \postscript "1.6 -0.2 moveto 2.6 0.8 lineto 1.8 -0.4 moveto 2.8 0.6 lineto 2.0 -0.6 moveto 3.0 0.4 lineto stroke" } %{ requires Lilypond 2.22+ %} """
-                else:
-                    ret += r"""_\tweak outside-staff-priority ##f ^\tweak avoid-slur #'inside _\markup {\with-dimensions #'(0 . 0) #'(2.5 . 2.1) \postscript "1.1 0.4 moveto 2.1 1.4 lineto 1.3 0.2 moveto 2.3 1.2 lineto 1.5 0.0 moveto 2.5 1.0 lineto stroke" } %{ requires Lilypond 2.22+ %} """
-            elif dots:
-                ret += r"""_\tweak outside-staff-priority ##f ^\tweak avoid-slur #'inside _\markup {\with-dimensions #'(0 . 0) #'(2.8 . 2.6) \postscript "1.4 1.6 moveto 2.4 2.6 lineto 1.6 1.4 moveto 2.6 2.4 lineto 1.8 1.2 moveto 2.8 2.2 lineto stroke" } %{ requires Lilypond 2.20 %} """
-            else:
-                ret += r"""_\tweak outside-staff-priority ##f ^\tweak avoid-slur #'inside _\markup {\with-dimensions #'(0 . 0) #'(2.5 . 2.6) \postscript "1.1 1.6 moveto 2.1 2.6 lineto 1.3 1.4 moveto 2.3 2.4 lineto 1.5 1.2 moveto 2.5 2.2 lineto stroke" } %{ requires Lilypond 2.20 %} """
+            self._apply_tremolo_to_note(
+                ret, placeholder_chord, tremolo, midi or western,
+                toAdd_preTuplet, dots
+            )
+
         if (
             nBeams
             and (not self.inBeamGroup or self.inBeamGroup == "restHack" or inRestHack)
@@ -1319,6 +1296,96 @@ class NoteheadMarkup:
             nBeams,
             octave,
         )
+
+    def _apply_tremolo_to_note(
+        self, ret, placeholder_chord, tremolo, is_midi_or_western, toAdd_preTuplet, dots
+    ):
+        """
+        Applies tremolo notation to the note markup
+
+        Args:
+        - ret (str): The current markup string.
+        - placeholder_chord (str): The basic representation of the note or chord.
+        - tremolo (str): Tremolo notation to be applied, either '' or ':32'.
+        - toAdd_preTuplet (Fraction): Duration of the note before tuplet adjustment.
+        - dots (str): Dots representing the note's duration extension.
+
+        Returns:
+        - str: The updated markup string with tremolo.
+        """
+        if is_midi_or_western:
+            if (
+                placeholder_chord.startswith("<")
+                and len(placeholder_chord.split()) == 4
+            ):
+                # Handling tremolo for chords in MIDI/Western notation
+                previous, n1, n2, gtLenDot = ret.rsplit(None, 3)
+                previous = previous[:-1]  # drop <
+                tremolo_count = int(toAdd_preTuplet / 4)
+                return f"{previous}\repeat tremolo {tremolo_count} {{ {n1}32 {n2}32 }}"
+            else:
+                return ret + tremolo
+        else:
+            # Handling tremolo in Lilypond 2.22+ or 2.20
+            tremolo_markup = self._get_tremolo_symbol(tremolo, dots)
+            return ret + tremolo_markup
+
+    def _get_tremolo_symbol(self, tremolo, dots):
+        """
+        Generates the tremolo markup for Lilypond.
+
+        Args:
+        - tremolo (str): The tremolo notation.
+        - dots (str): Dots representing the note's duration extension.
+
+        Returns:
+        - str: The tremolo markup.
+        """
+        if tremolo != ":32":
+            return ""
+
+        if lilypond_minor_version() >= 22:
+            if dots:
+                return (
+                    r"""_\tweak outside-staff-priority ##f """
+                    r"""^\tweak avoid-slur #'inside """
+                    r"""_\markup {\with-dimensions #'(0 . 0) #'(2.8 . 2.1) """
+                    r"""\postscript "1.6 -0.2 moveto 2.6 0.8 lineto 1.8 -0.4 moveto """
+                    r"""2.8 0.6 lineto 2.0 -0.6 moveto 3.0 0.4 lineto stroke" } """
+                    r"""%{ requires Lilypond 2.22+ %} """
+                )
+            else:
+                return (
+                    r"""_\tweak outside-staff-priority ##f """
+                    r"""^\tweak avoid-slur #'inside """
+                    r"""_\markup {\with-dimensions #'(0 . 0) #'(2.5 . 2.1) """
+                    r"""\postscript "1.1 0.4 moveto 2.1 1.4 lineto 1.3 0.2 moveto """
+                    r"""2.3 1.2 lineto 1.5 0.0 moveto 2.5 1.0 lineto stroke" } """
+                    r"""%{ requires Lilypond 2.22+ %} """
+                )
+        elif lilypond_minor_version() < 20:
+            errExit(
+                "tremolo requires Lilypond 2.20+, we found 2."
+                + str(lilypond_minor_version())
+            )
+        elif dots:
+            return (
+                r"""_\tweak outside-staff-priority ##f """
+                r"""^\tweak avoid-slur #'inside """
+                r"""_\markup {\with-dimensions #'(0 . 0) #'(2.8 . 2.6) """
+                r"""\postscript "1.4 1.6 moveto 2.4 2.6 lineto 1.6 1.4 moveto """
+                r"""2.6 2.4 lineto 1.8 1.2 moveto 2.8 2.2 lineto stroke" } """
+                r"""%{ requires Lilypond 2.20 %} """
+            )
+        else:
+            return (
+                r"""_\tweak outside-staff-priority ##f """
+                r"""^\tweak avoid-slur #'inside """
+                r"""_\markup {\with-dimensions #'(0 . 0) #'(2.5 . 2.6) """
+                r"""\postscript "1.1 1.6 moveto 2.1 2.6 lineto 1.3 1.4 moveto """
+                r"""2.3 2.4 lineto 1.5 1.2 moveto 2.5 2.2 lineto stroke" } """
+                r"""%{ requires Lilypond 2.20 %} """
+            )
 
 
 def parseNote(word, origWord, line):
