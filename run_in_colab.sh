@@ -25,6 +25,10 @@ install_packages() {
     sudo chmod a+x /usr/local/bin/mscore
 }
 
+# TODO: Control whether to output metronomeEnabled=true or
+# metronomeEnabled=false in the MuseScore configuration file based on
+# whether '-M' is specified.
+
 # Create MuseScore configuration file
 mkdir -p ~/.config/MuseScore
 cat > ~/.config/MuseScore/MuseScore4.ini << 'EOF'

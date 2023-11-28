@@ -1,6 +1,8 @@
-1. Sometimes, there are mismatching closing parentheses before `\breathe`,
-   especially in staff notation, causing a warning message. Need to find
-   an easy way to reproduce it and then resolve it.
-2. For the automatically generated staff notation, merge the tied notes.
-3. (Done) Need to figure out how to put time signature (4/4) after the key signature.
-4. (No need) Figure out how to typeset \breathe as 'V' on top.
+1. (Done) Need to figure out how to put time signature (4/4) after the key signature.
+2. (No need) For the automatically generated staff notation, merge the tied notes.
+3. (No need) Figure out how to typeset \breathe as 'V' on top.
+4. (Done) Add input argument to control padding between lines.
+5. Refactor code into different submodules.
+6. Fix support of accidentals and octaves inside chords.
+7. Support replacing R*\d,with R*1 when generating MIDI.
+8. Add support for repeating more than once.
