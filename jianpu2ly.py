@@ -208,15 +208,24 @@ def all_scores_start(poet1st, hasarranger):
 
     # Modify the headers section based on poet1st argument
     headers_poet_composer = (
-        r"\right-align \fromproperty #'header:poet" "\n"
-        r"\right-align \fromproperty #'header:composer" "\n"
-    ) if poet1st else (
-        r"\right-align \fromproperty #'header:composer" "\n"
-        r"\right-align \fromproperty #'header:poet" "\n"
+        (
+            r"\right-align \fromproperty #'header:poet"
+            "\n"
+            r"\right-align \fromproperty #'header:composer"
+            "\n"
+        )
+        if poet1st
+        else (
+            r"\right-align \fromproperty #'header:composer"
+            "\n"
+            r"\right-align \fromproperty #'header:poet"
+            "\n"
+        )
     )
 
-    nullrow = '\n' if hasarranger else '\null\n'
-    r += r"""
+    nullrow = "\n" if hasarranger else "\null\n"
+    r += (
+        r"""
 
 % un-comment the next line to remove Lilypond tagline:
 \header { tagline="" }
@@ -245,7 +254,10 @@ def all_scores_start(poet1st, hasarranger):
           \center-align \fromproperty #'header:piece
       }
       \dir-column {
-          """ + nullrow + headers_poet_composer + r"""
+          """
+        + nullrow
+        + headers_poet_composer
+        + r"""
           \right-align \fromproperty #'header:arranger
       }
     }
@@ -262,9 +274,8 @@ def all_scores_start(poet1st, hasarranger):
   left-margin = 25\mm
   right-margin = 25\mm
 """
-    if (
-        lilypond_minor_version() >= 20
-    ):
+    )
+    if lilypond_minor_version() >= 20:
         r += r"""
   #(define fonts
     (set-global-fonts
@@ -275,7 +286,7 @@ def all_scores_start(poet1st, hasarranger):
 
     if has_lyrics:
         global padding
-        r += fr"""
+        r += rf"""
   % Might need to enforce a minimum spacing between systems, especially if lyrics are
   % below the last staff in a system and numbers are on the top of the next
   system-system-spacing = #'((basic-distance . 7) (padding . {padding}) (stretchability . 1e7))
@@ -786,7 +797,8 @@ class NoteheadMarkup:
             self.lastNBeams
         ) = self.onePage = self.noBarNums = self.separateTimesig = 0
         self.keepLength = 0
-        self.last_octave = self.base_octave = ""
+        self.last_octaves = self.last_accidentals = []
+        self.base_octave = ""
         self.current_accidentals = {}
         self.barNo = 1
         self.tuplet = (1, 1)
@@ -868,45 +880,48 @@ class NoteheadMarkup:
         """
         self.base_octave = addOctaves(change, self.base_octave)
 
-    def _validate_figures(self, figures, accidental, word, line):
+    def _validate_figures(self, figures, accidentals, word, line):
         """
         Validates the figures based on specific rules and formats.
 
         Args:
-        - figures (str): The string of figures to be validated.
-        - accidental (str): The accidental associated with the figures.
+        - figures (list of str): List of figures to be validated.
+        - accidentals (list of str): List of accidentals to be validated.
         - word (str): The word for context, used in error reporting.
         - line (int): The line number for context, used in error reporting.
 
         Raises:
         - Exception: If validation fails.
         """
+
         # Check if figures contain more than one character
         if len(figures) > 1:
             if "0" in figures:
                 scoreError("Can't have rest in chord:", word, line)
             if "-" in figures:
                 scoreError("Dash not allowed in multi-figure chords:", word, line)
-            if accidental:
-                scoreError("Accidentals in chords not yet implemented:", word, line)
 
-    def _process_figures(self, figures, accidental, octave, word, line):
+        for acc in accidentals:
+            if acc not in ["", "#", "b"]:
+                scoreError("Can't handle accidental " + acc + " in", word, line)
+
+    def _process_figures(self, figures, accidentals, octaves, word, line):
         """
         Processes the figures to extract note names and placeholder chords.
 
         Args:
         - figures (str): a chord string of '1'-'7', or '0' or '-'.
-        - accidental (str): '', '#', 'b'.
-        - octave (str): '', "'", "''", "," or ",,".
+        - accidentals (list of str): list of '', '#', 'b' corresponding to each figure.
+        - octaves (list of str): list of '', "'", "''", "," or ",," corresponding to each figure.
         - word (str): for error handling.
         - line (int): for error handling.
 
         Returns:
-        - name (str): Concatenated name of the note.
+        - names (list of str): List of concatenated names of the notes.
         - placeholder_chord (str): Placeholder chord string.
-        - updated_figures (str): Modified figures.
-        - updated_accidental (str): Modified accidental.
-        - updated_octave (str): Modified octave.
+        - updated_figures (list of str): Modified figures.
+        - updated_accidentals (list of str): Modified accidentals.
+        - updated_octaves (list of str): Modified octaves.
         - invisTieLast (bool): Flag indicating if an invisible tie is present.
         """
 
@@ -924,77 +939,104 @@ class NoteheadMarkup:
 
         def get_placeholder_chord(figures):
             if len(figures) == 1:
-                return placeholders[figures]
+                return placeholders[figures[0]]
             elif not midi and not western:
-                return "c"  # we'll override its appearance
+                return "c"  # Override appearance
             else:
-                return "< " + " ".join(placeholders[f] for f in list(figures)) + " >"
+                return "< " + " ".join(placeholders[f] for f in figures) + " >"
 
-        placeholder_chord = get_placeholder_chord(figures)
         invisTieLast = (
             dashes_as_ties
             and self.last_figures
-            and figures == "-"
+            and figures[0] == "-"
             and not self.last_was_rest
         )
-        self.last_was_rest = figures == "0" or (figures == "-" and self.last_was_rest)
-        name = "".join(names[f] for f in figures)
-        if not_angka:
-            # include accidental in the lookup key
-            # because it affects the notehead shape
-            figures += accidental  # TODO: chords?
-            name += {"#": "-sharp", "b": "-flat", "": ""}[accidental]
-        if invisTieLast:  # (so figures == "-")
-            figures += self.last_figures  # (so "-" + last)
-            name += "".join(names[f] for f in self.last_figures)
+
+        if invisTieLast:
+            assert len(figures) == 1
+
+            figures = [
+                "-" + f for f in self.last_figures
+            ]  # Prepend '-' to each last figure
+            octaves = self.last_octaves  # for MIDI or 5-line
+            accidentals = self.last_accidentals
+            combined_name = "-" + "".join(names[f] for f in self.last_figures)
             placeholder_chord = get_placeholder_chord(self.last_figures)
-            octave = self.last_octave  # for MIDI or 5-line
-            accidental = self.last_accidental  # ditto
         else:
-            octave = addOctaves(octave, self.base_octave)
-            if octave not in [",,", ",", "", "'", "''"]:
-                scoreError("Can't handle octave " + octave + " in", word, line)
-            self.last_octave = octave
-        self.last_figures = figures
-        if len(self.last_figures) > 1 and self.last_figures[0] == "-":
-            self.last_figures = self.last_figures[1:]
+            combined_name = ""
+            for fig, acc in zip(figures, accidentals):
+                name = names[fig]
+                if not_angka:
+                    fig += acc
+                    name += {"#": "-sharp", "b": "-flat", "": ""}[fig]
+                combined_name += name
 
-        return name, placeholder_chord, figures, accidental, octave, invisTieLast
+            placeholder_chord = get_placeholder_chord(figures)
+            octaves = [addOctaves(octv, self.base_octave) for octv in octaves]
+            for octave in octaves:
+                if octave not in [",,", ",", "", "'", "''"]:
+                    scoreError("Can't handle octave " + octave + " in", word, line)
 
-    def __call__(self, figures, nBeams, dots, octave, accidental, tremolo, word, line):
+            self.last_figures = figures
+            self.last_octaves = octaves
+            self.last_accidentals = accidentals
+
+        assert self.last_figures[0] != "-"
+
+        # Combine placeholder chords for chords
+        self.last_was_rest = figures == ["0"] or (
+            figures == ["-"] and self.last_was_rest
+        )
+
+        return (
+            combined_name,
+            placeholder_chord,
+            figures,
+            accidentals,
+            octaves,
+            invisTieLast,
+        )
+
+    def toMarkup(
+        self, figures, nBeams, dots, octaves, accidentals, tremolo, word, line
+    ):
         """
         Calls the NoteheadMarkup object.
 
         Args:
-        - figures (str): a chord string of '1'-'7', or '0' or '-'.
+        - figures (list): list of chord string(s) of '1'-'7', or '0' or '-'.
         - nBeams (int): number of beams for this note.
         - dots (str): extra length.
-        - octave (str): '', "'", "''", "," or ",,".
-        - accidental (str): '', '#', 'b'.
+        - octave (list): list of '', "'", "''", "," or ",,", matching figures.
+        - accidental (list): list of '', '#', 'b', matching figures.
         - tremolo (str): '' or ':32'.
         - word (str): for error handling.
         - line (int): for error handling.
         """
 
         # Validate figures
-        self._validate_figures(figures, accidental, word, line)
+        self._validate_figures(figures, accidentals, word, line)
 
         # Keep track of notes processed
-        self.notesHad.append(figures)
+        self.notesHad.append("".join(figures))
 
         # Process figures
         (
             name,
             placeholder_chord,
             figures,
-            accidental,
-            octave,
+            accidentals,
+            octaves,
             invisTieLast,
-        ) = self._process_figures(figures, accidental, octave, word, line)
+        ) = self._process_figures(figures, accidentals, octaves, word, line)
 
-        if accidental not in ["", "#", "b"]:
-            scoreError("Can't handle accidental " + accidental + " in", word, line)
-        self.last_accidental = accidental
+        if figures[0][0] == "-":
+            figures = "-" + "".join([f[1:] for f in figures])
+        else:
+            figures = "".join(figures)
+        octave = "".join(octaves)
+        accidental = "".join(accidentals)
+
         if figures not in self.defines_done and not midi and not western:
             # Define a notehead graphical object for the figures
             self.defines_done[figures] = "note-" + name
@@ -1319,7 +1361,15 @@ def parseNote(word, origWord, line):
     # unrecognised stuff in it: flag as error, rather than ignoring and possibly getting a puzzling barsync fail
     if not re.match(r"[0-7.,'cqsdh\\#b-]+$", word):
         scoreError("Unrecognised command", origWord, line)
-    figures = "".join(re.findall("[01234567-]", word))
+
+    # Identify figures with accidentals and octave indicators
+    notes_with_accidental_octave = re.findall(r"[#b]*[-0-7][',]*", word)
+    figures = [re.sub(r"[#b',]+", "", note) for note in notes_with_accidental_octave]
+    accidentals = [
+        re.sub(r"[0-7',-]", "", note) for note in notes_with_accidental_octave
+    ]
+    octaves = [re.sub(r"[#b0-7]", "", note) for note in notes_with_accidental_octave]
+
     dots = "".join(c for c in word if c == ".")
     nBeams = "".join(re.findall(r"[cqsdh\\]", word))
     if re.match(r"[\\]+$", nBeams):
@@ -1335,9 +1385,8 @@ def parseNote(word, origWord, line):
             )
     else:
         nBeams = None  # unspecified
-    octave = "".join(c for c in word if c in "',")
-    accidental = "".join(c for c in word if c in "#b")
-    return figures, nBeams, dots, octave, accidental, tremolo
+
+    return figures, nBeams, dots, octaves, accidentals, tremolo
 
 
 def write_docs():
@@ -1423,7 +1472,9 @@ def merge_lyrics(content):
     def process_part(part):
         def process_line(line):
             # Replace 'w*n' pattern with n copies of w and space '_'
-            line = re.sub(r"(.)\*(\d+)", lambda m: "".join([m.group(1)] * int(m.group(2))), line)
+            line = re.sub(
+                r"(.)\*(\d+)", lambda m: "".join([m.group(1)] * int(m.group(2))), line
+            )
             line = re.sub(r"(?<!\s)_", " _", line)
             line = re.sub(r"_(?!\s)", "_ ", line)
             return line
@@ -1450,7 +1501,9 @@ def merge_lyrics(content):
             replace_first_H.first_encountered = False
             part = re.sub(
                 r"^\s*" + label + ".*(\n|$)",
-                lambda m: replace_first_H(m) if not replace_first_H.first_encountered else "",
+                lambda m: replace_first_H(m)
+                if not replace_first_H.first_encountered
+                else "",
                 part,
                 flags=re.MULTILINE,
             )
@@ -2118,14 +2171,21 @@ def process_note(
             return lastPtr, afternext, need_final_barline, maxBeams
 
     # Parse the note to separate its components (figures, beams, etc.)
-    figures, nBeams, dots, octave, accidental, tremolo = parseNote(word, word0, line)
+    figures, nBeams, dots, octaves, accidentals, tremolo = parseNote(word, word0, line)
     need_final_barline = (
         True  # After processing a note, a final barline is assumed to be needed
     )
 
     # Call the notehead markup function to get necessary markups before and after the note
-    b4last, aftrlast, this, need_space_for_accidental, nBeams, octave = notehead_markup(
-        figures, nBeams, dots, octave, accidental, tremolo, word0, line
+    (
+        b4last,
+        aftrlast,
+        this,
+        need_space_for_accidental,
+        nBeams,
+        octave,
+    ) = notehead_markup.toMarkup(
+        figures, nBeams, dots, octaves, accidentals, tremolo, word0, line
     )
 
     # If there's any markup before the last note, prepend it to the last note in the output
@@ -3093,7 +3153,7 @@ def parse_arguments():
         "--padding",
         type=int,
         default=0,
-        help="specify the spacing or padding between lines, defaults to 3"
+        help="specify the spacing or padding between lines, defaults to 3",
     )
 
     parser.add_argument(
@@ -3251,23 +3311,29 @@ def normalize_volume(filename, inplace=True):
         normalized_audio = audio.apply_gain(change_in_dBFS)
 
         if not inplace:
-            filename = 'normalized_' + filename
+            filename = "normalized_" + filename
         normalized_audio.export(filename, format="mp3")
 
     except ImportError:
         # pydub is not available, use ffmpeg instead
         cmd_detect_volume = f"ffmpeg -i {filename} -af volumedetect -f null /dev/null"
-        result = subprocess.run(cmd_detect_volume, capture_output=True, text=True, shell=True)
-        max_volume_line = [line for line in result.stderr.split('\n') if "max_volume" in line]
+        result = subprocess.run(
+            cmd_detect_volume, capture_output=True, text=True, shell=True
+        )
+        max_volume_line = [
+            line for line in result.stderr.split("\n") if "max_volume" in line
+        ]
         if max_volume_line:
-            max_volume = max_volume_line[0].split(':')[1].strip().replace(' dB', '')
+            max_volume = max_volume_line[0].split(":")[1].strip().replace(" dB", "")
             volume_adjustment = str(-float(max_volume))
 
             # Create a unique temporary file
-            with tempfile.NamedTemporaryFile(delete=True, suffix='.mp3') as temp_file:
+            with tempfile.NamedTemporaryFile(delete=True, suffix=".mp3") as temp_file:
                 temp_filename = temp_file.name
 
-            cmd_normalize_volume = f"ffmpeg -i {filename} -af volume={volume_adjustment}dB {temp_filename}"
+            cmd_normalize_volume = (
+                f"ffmpeg -i {filename} -af volume={volume_adjustment}dB {temp_filename}"
+            )
             subprocess.run(cmd_normalize_volume, shell=True)
 
             # Move the temp file to overwrite the original file if inplace is True
