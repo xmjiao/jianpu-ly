@@ -305,6 +305,11 @@ def score_start():
     If `midi` is True, the score will be unfolded. If `notehead_markup.noBarNums`
     and `midi` are both False, the score will include bar numbers.
 
+    Args:
+        midi: A boolean whether to include MIDI instructions.
+        notehead_markup: An object that specifies if bar numbers should be omitted.
+        bar_number_every: Specifies the interval of bars at which to display numbers.
+
     Returns:
         str: The starting string for a LilyPond score.
     """
@@ -312,10 +317,12 @@ def score_start():
     if midi:
         ret += "\\unfoldRepeats\n"
     ret += r"<< "
-    if not notehead_markup.noBarNums and not midi:
+    if not midi and (notehead_markup is None or not notehead_markup.noBarNums):
         ret += (
-            "\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible %d)"
-            % bar_number_every
+            # Draw a box round the bar number(s)
+            "\\override Score.BarNumber.stencil = #(make-stencil-boxer 0.1 0.25 ly:text-interface::print)\n"
+            "\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n"
+            f"\\set Score.barNumberVisibility = #(every-nth-bar-number-visible {bar_number_every})"
         )
     return ret
 
