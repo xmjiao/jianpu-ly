@@ -4,3 +4,13 @@
 2. For the automatically generated staff notation, merge the tied notes.
 3. (Done) Need to figure out how to put time signature (4/4) after the key signature.
 4. (No need) Figure out how to typeset \breathe as 'V' on top.
+
+Changes to upstream that haven't yet been brought into this version
+(they might not all be needed though...)
+* bug fix for short rests inside beamed groups splitting the beams https://github.com/ssb22/jianpu-ly/commit/652b8c166fe7161befec6f5e869dbeac119a0d19
+* ties should always start from numbers, never from dashes https://github.com/ssb22/jianpu-ly/commit/5bfe561b42783e57e5defe530b876d3b7a813fc3
+  (does `convert_ties_to_slurs` do the same thing?)
+* RaggedLast & NoIndent options
+* --version option (should be easy with argparse!)
+* guitar chords option https://github.com/ssb22/jianpu-ly/commit/1125b35e065f2f98de31217b44162da068ccfe59
+* j2ly_lyric_size different from j2ly_staff_size
