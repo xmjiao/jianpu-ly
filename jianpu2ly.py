@@ -319,6 +319,7 @@ def score_start():
     ret += r"<< "
     if not midi and (notehead_markup is None or not notehead_markup.noBarNums):
         ret += (
+            "\\override Score.BarNumber.font-size = #-3\n"
             # Draw a box round the bar number(s)
             "\\override Score.BarNumber.stencil = #(make-stencil-boxer 0.1 0.25 ly:text-interface::print)\n"
             "\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n"
