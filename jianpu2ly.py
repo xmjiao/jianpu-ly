@@ -223,7 +223,7 @@ def all_scores_start(poet1st, hasarranger):
         )
     )
 
-    nullrow = "\n" if hasarranger else "\null\n"
+    nullrow = "\n" if hasarranger else "\n"
     r += (
         r"""
 
@@ -279,7 +279,7 @@ def all_scores_start(poet1st, hasarranger):
         r += r"""
   #(define fonts
     (set-global-fonts
-     #:roman "Times New Roman,Liberation Serif,Arial Unicode MS,Noto Serif CJK SC"
+     #:roman "Noto Serif CJK SC,Times New Roman,Liberation Serif,Arial Unicode MS"
      #:factor (/ staff-height pt 20)
     ))
 """
