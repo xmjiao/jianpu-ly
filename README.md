@@ -1,10 +1,10 @@
 # jianpu-ly
 
-Jianpu in Lilypond, from http://ssb22.user.srcf.net/mwrhome/jianpu-ly.html
+Jianpu in Lilypond, forked and expanded from http://ssb22.user.srcf.net/mwrhome/jianpu-ly.html
 
-(also mirrored at http://ssb22.gitlab.io/mwrhome/jianpu-ly.html just in case)
+(which is also mirrored at http://ssb22.gitlab.io/mwrhome/jianpu-ly.html just in case)
 
-jianpu-ly is a Python program (compatible with both Python 2 and Python 3) that assists with printing jianpu (numbered musical notation) in the GNU Lilypond music typesetter. The jianpu is written on a modiﬁed-appearance “stave” in Lilypond, which means Lilypond’s typesetting capabilities (lyric spacing, slurs, beams etc) will apply to the jianpu without needing to add a 5-line stave. If you prefer, the generated code for the jianpu stave may also be placed in a score with other types of stave.
+This is a Python program (requiring Python 3.6 or above) that assists with printing jianpu (numbered musical notation) in the GNU Lilypond music typesetter. The jianpu is written on a modiﬁed-appearance “stave” in Lilypond, which means Lilypond’s typesetting capabilities (lyric spacing, slurs, beams etc) will apply to the jianpu without needing to add a 5-line stave. If you prefer, the generated code for the jianpu stave may also be placed in a score with other types of stave.
 
 Using jianpu-ly requires some technical knowledge.  If you don't know what a command line is, what a text editor is, what a directory is or what Python is, then please find out about these things before attempting to use jianpu-ly.  It is not an extension to Lilypond front-ends like Frescobaldi; it is a preprocessor that currently requires you to have command-line experience.
 
@@ -85,6 +85,8 @@ Da capo: `1 1 Fine 1 1 1 1 1 1 DC`
 
 Repeat (with alternate endings): `R{ 1 1 1 } A{ 2 | 3 }`
 
+Repeat twice (with alternate endings) twice: `R3{ 1 1 1 } A{ 2 | 3 | 4 }`
+
 Short repeats (percent): `R4{ 1 2 }`
 
 Ties (like Lilypond's, if you don't want dashes): `1 ~ 1`
@@ -99,11 +101,11 @@ Tremolo: `1/// - 1///5 -`
 
 Rehearsal letters: `letterA letterB`
 
-Multibar rest: `R*8`
+Multibar rest: `R*8 0*32`
 
 Dynamics (applies to previous note): `\p \mp \f`
 
-Other 1-word Lilypond \ commands: `\fermata \> \! \( \) etc`
+Other 1-word Lilypond \ commands: `\fermata \> \! \( \)` etc
 
 Text: `^"above note" _"below note"`
 
@@ -117,8 +119,10 @@ Ignored: `% a comment`
 Copyright and Trademarks
 ------------------------
 
-(c) Silas S. Brown, licensed under Apache 2.
+* (c) Xiangmin Jiao 2023
+* (c) Silas S. Brown 2012-2023
+* Licensed under Apache 2.
 
 Apache is a registered trademark of The Apache Software Foundation.
 Python is a trademark of the Python Software Foundation.
-Any other trademarks I mentioned without realising are trademarks of their respective holders.
+Any other trademarks are trademarks of their respective holders.

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # jianpu2ly: Jianpu to LilyPond Converter with Jianpu and/or Staff Notation Output
 # v0.1 (c) 2023 Xiangmin Jiao <xmjiao@gmail.com>
@@ -102,11 +102,9 @@ import requests
 import subprocess
 import six
 
-from fractions import Fraction as F  # requires Python 2.6+
+from fractions import Fraction as F
 from string import ascii_letters as letters
 from subprocess import getoutput
-
-unichr, xrange = chr, range
 
 # Control options
 bar_number_every = 1
@@ -129,7 +127,7 @@ def as_unicode(input_string):
     elif isinstance(input_string, six.binary_type):
         return input_string.decode("utf-8")
     else:
-        raise TypeError("Expected unicode or bytes, got %r" % input_string)
+        raise TypeError(f"Expected unicode or bytes, got {input_string}")
 
 
 def lilypond_minor_version():
@@ -162,14 +160,10 @@ def lilypond_command():
     Returns the path to the LilyPond executable if it is installed on the system.
     If LilyPond is not found, returns None.
     """
-    if hasattr(shutil, "which"):
-        w = shutil.which("lilypond")
-        if w:
-            return "lilypond"
+    w = shutil.which("lilypond")
+    if w:
+        return "lilypond"
     elif not sys.platform.startswith("win"):
-        cmd = getoutput("which lilypond 2>/dev/null")
-        if os.path.exists(cmd):
-            return "lilypond"
         # e.g. from Mac OS 10.4-10.14 Intel build https://web.archive.org/web/20221121202056/https://lilypond.org/download/binaries/darwin-x86/lilypond-2.22.2-1.darwin-x86.tar.bz2 (unpacked and moved to /Applications), or similarly 2.20 for macOS 10.15+ from https://gitlab.com/marnen/lilypond-mac-builder/-/package_files/9872804/download
         placesToTry = ["/Applications/LilyPond.app/Contents/Resources/bin/lilypond"]
         # if renamed from the above (try specific versions 1st, in case default is older)
@@ -201,9 +195,8 @@ def all_scores_start(poet1st, hasarranger):
     # Small: j2ly_staff_size=17.82
     # Tiny: j2ly_staff_size=15.87
     r = (
-        r"""\version "2.18.0"
-#(set-global-staff-size %g)"""
-        % staff_size
+        fr"""\version "2.18.0"
+#(set-global-staff-size {staff_size})"""
     )
 
     # Modify the headers section based on poet1st argument
@@ -227,7 +220,7 @@ def all_scores_start(poet1st, hasarranger):
     r += (
         r"""
 
-% un-comment the next line to remove Lilypond tagline:
+% comment out the next line to have Lilypond tagline:
 \header { tagline="" }
 
 \pointAndClickOff
@@ -265,10 +258,6 @@ def all_scores_start(poet1st, hasarranger):
   % un-comment the next line for no page numbers:
   % print-page-number = ##f
 
-  % un-comment the next 3 lines for a binding edge:
-  % two-sided = ##t
-  % inner-margin = 25\mm
-  % outer-margin = 25\mm
   top-margin = 20\mm
   bottom-margin = 25\mm
   left-margin = 25\mm
@@ -314,8 +303,7 @@ def score_start():
     ret += r"<< "
     if not notehead_markup.noBarNums and not midi:
         ret += (
-            "\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible %d)"
-            % bar_number_every
+            f"\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible {bar_number_every})"
         )
     return ret
 
@@ -815,22 +803,16 @@ class NoteheadMarkup:
             pass
         elif os.environ.get("j2ly_sloppy_bars", ""):
             sys.stderr.write(
-                "Wrong bar length at end of score %d ignored (j2ly_sloppy_bars set)\n"
-                % scoreNo
+                f"Wrong bar length at end of score {scoreNo} ignored (j2ly_sloppy_bars set)\n"
             )
         elif self.startBarPos and not self.barPos:
             # this is on the music theory syllabi at about Grade 3, but you can get up to Grade 5 practical without actually covering it, so we'd better not expect all users to understand "final bar does not make up for anacrusis bar"
             errExit(
-                "Score %d should end with a %g-beat bar to make up for the %g-beat anacrusis bar.  Set j2ly_sloppy_bars environment variable if you really want to break this rule."
-                % (
-                    scoreNo,
-                    self.startBarPos / self.beatLength,
-                    (self.barLength - self.startBarPos) / self.beatLength,
-                )
+                f"Score {scoreNo} should end with a {self.startBarPos / self.beatLength}-beat bar to make up for the {(self.barLength - self.startBarPos) / self.beatLength}-beat anacrusis bar.  Set j2ly_sloppy_bars environment variable if you really want to break this rule."
             )
         else:
             errExit(
-                "Incomplete bar at end of score %d (pos %d)" % (scoreNo, self.barPos)
+                f"Incomplete bar at end of score {scoreNo} ({self.barPos/self.beatLength} beats)"
             )
 
     def setTime(self, num, denom):
@@ -860,7 +842,7 @@ class NoteheadMarkup:
             self.barPos -= F(64) / denom / 2
         if self.barPos < 0:
             # but anacrusis being exactly equal to bar is OK: we'll just interpret that as no anacrusis
-            errExit("Anacrusis is longer than bar in score %d" % scoreNo)
+            errExit(f"Anacrusis is longer than bar in score {scoreNo}")
         self.startBarPos = self.barPos
 
     def wholeBarRestLen(self):
@@ -1045,8 +1027,6 @@ class NoteheadMarkup:
                     figuresNew = "."
                 else:
                     figuresNew = "\u2013"
-                    if not isinstance("", six.text_type):
-                        figuresNew = figuresNew.encode("utf-8")
             else:
                 figuresNew = figures
             ret = (
@@ -1062,19 +1042,13 @@ class NoteheadMarkup:
             )
             if len(figuresNew) == 1 or figures.startswith("-"):
                 ret += (
-                    """(make-lower-markup 0.5 (make-bold-markup "%s")))))))
+                    f"""(make-lower-markup 0.5 (make-bold-markup "{figuresNew}")))))))
 """
-                    % figuresNew
                 )
             elif not_angka and accidental:  # not chord
                 # TODO: the \ looks better than the / in default font
                 u338, u20e5 = "\u0338", "\u20e5"
-                if not isinstance("", six.text_type):
-                    u338, u20e5 = u338.encode("utf-8"), u20e5.encode("utf-8")
-                ret += '(make-lower-markup 0.5 (make-bold-markup "%s%s")))))))\n' % (
-                    figures[:1],
-                    {"#": u338, "b": u20e5}[accidental],
-                )
+                ret += f'(make-lower-markup 0.5 (make-bold-markup "{figures[:1]}{{"#": u338, "b": u20e5}[accidental]}")))))))\n'
             else:
                 ret += (
                     """(markup (#:lower 0.5
@@ -1190,7 +1164,7 @@ class NoteheadMarkup:
                 ret += {"": "'", "'": "''", "''": "'''", ",": "", ",,": ","}[
                     octave
                 ]  # for MIDI + Western, put it so no-mark starts near middle C
-        ret += ("%d" % length) + dots
+        ret += f"{length}{dots}"
 
         if tremolo:
             self._apply_tremolo_to_note(
@@ -1211,18 +1185,7 @@ class NoteheadMarkup:
         # sys.stderr.write(accidental+figure+octave+dots+"/"+str(nBeams)+"->"+str(self.barPos)+" ") # if need to see where we are
         if self.barPos > self.barLength:
             errExit(
-                '(notesHad=%s) barcheck fail: note crosses barline at "%s" with %d beams (%d skipped from %d to %d, bypassing %d), scoreNo=%d barNo=%d (but the error could be earlier)'
-                % (
-                    " ".join(self.notesHad),
-                    figures,
-                    nBeams,
-                    toAdd,
-                    self.barPos - toAdd,
-                    self.barPos,
-                    self.barLength,
-                    scoreNo,
-                    self.barNo,
-                )
+                f'(notesHad={" ".join(self.notesHad)}) barcheck fail: note crosses barline at "{figures}" with {nBeams} beams ({toAdd} skipped from {self.barPos - toAdd} to {self.barPos}, bypassing {self.barLength}), scoreNo={scoreNo} barNo={self.barNo} (but the error could be earlier)'
             )
         # (self.inBeamGroup is set only if not midi/western)
         if self.barPos % self.beatLength == 0 and self.inBeamGroup:
@@ -1417,10 +1380,7 @@ def parseNote(word, origWord, line):
         # (for not angka, TODO: document that this is now acceptable as an input word?)
         word = "-"
     word = word.replace("8", "1'").replace("9", "2'")
-    if isinstance("", six.text_type):
-        word = word.replace("\u2019", "'")
-    else:
-        word = word.replace("\u2019".encode("utf-8"), "'")
+    word = word.replace("\u2019", "'")
     if "///" in word:
         tremolo, word = ":32", word.replace("///", "", 1)
     else:
@@ -1651,7 +1611,7 @@ def get_input(infile, is_google_drive=False):
     """
     inDat = getInput0(infile, is_google_drive)
 
-    for i in xrange(len(inDat)):
+    for i in range(len(inDat)):
         if inDat[i].startswith("\xef\xbb\xbf"):
             inDat[i] = inDat[i][3:]
         if inDat[i].startswith(r"\version"):
@@ -1673,17 +1633,12 @@ def fix_utf8(stream, mode):
     Returns:
         The stream with the fixed encoding.
     """
-    if isinstance(
-        "", six.text_type
-    ):  # Python 3: please use UTF-8 for Lilypond, even if the system locale says something else
-        import codecs
-
-        if mode == "r":
-            return codecs.getreader("utf-8")(stream.buffer)
-        else:
-            return codecs.getwriter("utf-8")(stream.buffer)
+    # Python 3: please use UTF-8 for Lilypond, even if the system locale says something else
+    import codecs
+    if mode == "r":
+        return codecs.getreader("utf-8")(stream.buffer)
     else:
-        return stream
+        return codecs.getwriter("utf-8")(stream.buffer)
 
 
 def fix_fullwidth(t):
@@ -1696,14 +1651,11 @@ def fix_fullwidth(t):
     Returns:
     str: The processed string with fullwidth characters replaced by their ASCII equivalents.
     """
-    if isinstance("", six.text_type):
-        utext = t
-    else:
-        utext = t.decode("utf-8")
+    utext = t
     r = []
     for c in utext:
         if 0xFF01 <= ord(c) <= 0xFF5E:
-            r.append(unichr(ord(c) - 0xFEE0))
+            r.append(chr(ord(c) - 0xFEE0))
         elif c == "\u201a":
             r.append(",")  # sometimes used as comma (incorrectly)
         elif c == "\uff61":
@@ -1711,10 +1663,7 @@ def fix_fullwidth(t):
         else:
             r.append(c)
     utext = "".join(r)
-    if isinstance("", six.text_type):
-        return utext
-    else:
-        return utext.encode("utf-8")
+    return utext
 
 
 def graceNotes_markup(notes, isAfter):
@@ -1735,10 +1684,8 @@ def graceNotes_markup(notes, isAfter):
     r = []
     afternext = None
     thinspace = "\u2009"
-    if not isinstance("", six.text_type):
-        thinspace = thinspace.encode("utf-8")
     notes = grace_octave_fix(notes)
-    for i in xrange(len(notes)):
+    for i in range(len(notes)):
         n = notes[i]
         if n == "#":
             r.append(r"\fontsize #-4 { \raise #0.6 { \sharp } }")
@@ -1770,7 +1717,7 @@ def graceNotes_markup(notes, isAfter):
             if r and r[-1].endswith('"'):
                 r[-1] = r[-1][:-1] + n + '"'
             else:
-                r.append('"%s"' % n)
+                r.append(f'"{n}"')
             if afternext:
                 r.append(afternext)
                 afternext = None
@@ -1820,7 +1767,7 @@ def gracenotes_western(notes):
     nextAcc = ""
     next8ve = "'"
     r = []
-    for i in xrange(len(notes)):
+    for i in range(len(notes)):
         n = notes[i]
         if n == "#":
             nextAcc = "is"
@@ -1986,14 +1933,8 @@ def process_lyrics_line(line, do_hanzi_spacing):
         and (line[1] == "." or as_unicode(line)[1] == "\uff0e")
     ):
         # a verse number
-        toAdd = r'\set stanza = #"%s." ' % line[:1]
-        if line[1] == ".":
-            line = line[2:]
-        elif not isinstance(line, six.text_type):
-            line = line[4:]  # for utf-8 full-width dot in Python 2
-        else:
-            line = line[2:]  # for full-width dot in Python 3
-        line = line.strip()
+        toAdd = fr'\set stanza = #"{line[:1]}." '
+        line = line[2:].strip()
 
     if do_hanzi_spacing:
         # Handle Chinese characters (hanzi) and related spacing:
@@ -2022,8 +1963,6 @@ def process_lyrics_line(line, do_hanzi_spacing):
             else:
                 l2.append(c)
         line = "".join(l2)
-        if not isinstance("", six.text_type):
-            line = line.encode("utf-8")  # Python 2
 
     # Replace certain characters and encode as needed, and
     # prepare the lyrics line with or without verse numbers.
@@ -2138,7 +2077,7 @@ def process_fingering(word, out):
     finger_unicode = finger_to_unicode.get(finger, finger)
 
     # Append the LilyPond finger notation command
-    out.append(r'\finger "%s"' % finger_unicode)
+    out.append(fr'\finger "{finger_unicode}"')
 
 
 def process_time_signature(word, out, notehead_markup, midi):
@@ -2801,7 +2740,7 @@ def getLY(score, headers=None, midi=True):
 
     # Final checks and finalizations
     if notehead_markup.barPos == 0 and notehead_markup.barNo == 1:
-        errExit("No jianpu in score %d" % scoreNo)
+        errExit(f"No jianpu in score {scoreNo}")
     if (
         notehead_markup.inBeamGroup
         and not midi
@@ -2812,9 +2751,9 @@ def getLY(score, headers=None, midi=True):
     if inTranspose:
         out.append("}")
     if repeatStack:
-        errExit("Unterminated repeat in score %d" % scoreNo)
+        errExit(f"Unterminated repeat in score {scoreNo}")
     if escaping:
-        errExit("Unterminated LP: in score %d" % scoreNo)
+        errExit(f"Unterminated LP: in score {scoreNo}")
     notehead_markup.endScore()  # perform checks
 
     # Finalize the output by performing additional cleanup
