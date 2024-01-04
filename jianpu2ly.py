@@ -1047,8 +1047,8 @@ class NoteheadMarkup:
                 )
             elif not_angka and accidental:  # not chord
                 # TODO: the \ looks better than the / in default font
-                u338, u20e5 = "\u0338", "\u20e5"
-                ret += f'(make-lower-markup 0.5 (make-bold-markup "{figures[:1]}{{"#": u338, "b": u20e5}[accidental]}")))))))\n'
+                accidental_markup = {"#": "\u0338", "b": "\u20e5"}[accidental]
+                ret += f'(make-lower-markup 0.5 (make-bold-markup "{figures[:1]}{accidental_markup}")))))))\n'
             else:
                 ret += (
                     """(markup (#:lower 0.5
