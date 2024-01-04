@@ -13,7 +13,7 @@ install_packages() {
     # Install Microsoft fonts
     echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
     sudo apt-get -q -y install ttf-mscorefonts-installer > /dev/null 2>&1
-    wget -q -O /tmp/arial-unicode-ms.zip "https://cofonts.com/download/Arial-Unicode-MS-Font"
+    wget -q -O /tmp/arial-unicode-ms.zip "https://dw.fontdafont.com/download/arial-unicode-ms-font"
     sudo unzip -q /tmp/arial-unicode-ms.zip -d /usr/share/fonts/truetype
     sudo fc-cache -f
     rm -f /tmp/arial-unicode-ms.zip
