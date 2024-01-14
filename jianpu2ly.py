@@ -3046,7 +3046,7 @@ def reformat_key_time_signatures(s, with_staff):
 
         # Update original string with sorted time signatures
         keysig = re.search(r"\\mark \\markup\{\s*([16]=[♭♯]?[A-G])\}", s).group(1)
-        s = re.sub(r"(\\mark \\markup\{)[16]=([♭♯]?[A-G])\}", "", s, count=1)
+        s = re.sub(r"(\\override Staff\.Stem\.transparent = ##t\s+)\\mark \\markup\{[16]=[♭♯]?[A-G]\}", r"\1", s)
         s = s.replace(
             'keytimesignature=""',
             r"keytimesignature=\markup{ \concat { "
