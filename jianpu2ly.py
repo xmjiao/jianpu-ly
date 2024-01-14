@@ -453,11 +453,12 @@ def jianpu_staff_start(inst=None, withStaff=False):
         else "\n%% === BEGIN JIANPU STAFF ===\n"
     )
     r += r"\new RhythmicStaff \with {"
-    r += '\n    \\consists "Accidental_engraver" ' if not not_angka else ""
+    r += '\n    \\consists "Accidental_engraver"' if not not_angka else ""
 
     # Adding instrument name if provided
     if inst:
         r += '\n    instrumentName = "' + inst + '"'
+        r += '\n    shortInstrumentName = "' + inst + '"'
 
     # Adjusting spacing for an associated Western staff
     if withStaff:
@@ -479,6 +480,7 @@ def jianpu_staff_start(inst=None, withStaff=False):
     r += j
     r += r"""
     \override Staff.TimeSignature #'style = #'numbered
+    \once \omit Staff.TimeSignature
     \override Staff.Stem #'transparent = ##t
     """
 
@@ -2864,6 +2866,17 @@ def process_input(inDat, withStaff=False):
     ret = "".join(r + "\n" for r in ret)
     ret = re.sub(r'([\^_])"(\\[^"]+)"', r"\1\2", ret)
 
+    # Add staff group if there are multiple sections starting with "BEGIN JIANPU STAFF".
+    # If so, add "\new StaffGroup <<" after first occurance of "%% === BEGIN JIANPU STAFF ===".
+    # and add ">>" after the last occurance of "% === END JIANPU STAFF ==="
+    if ret.count("=== BEGIN JIANPU STAFF ===") > 1:
+        ret = ret.replace(
+            "=== BEGIN JIANPU STAFF ===",
+            "=== BEGIN JIANPU STAFF ===\n\\new StaffGroup <<",
+            1,
+        )
+        ret = "=== END JIANPU STAFF ===\n>>".join(ret.rsplit("=== END JIANPU STAFF ===", 1))
+
     if lilypond_minor_version() >= 24:
         # needed to avoid deprecation warnings on Lilypond 2.24
         ret = re.sub(r"(\\override [A-Z][^ ]*) #'", r"\1.", ret)
@@ -3031,11 +3044,9 @@ def reformat_key_time_signatures(s, with_staff):
             ]
         )
 
-        omittimesig = r"\\once \\omit Staff.TimeSignature"
-
         # Update original string with sorted time signatures
         keysig = re.search(r"\\mark \\markup\{\s*([16]=[♭♯]?[A-G])\}", s).group(1)
-        s = re.sub(r"(\\mark \\markup\{)[16]=([♭♯]?[A-G])\}", omittimesig, s, count=1)
+        s = re.sub(r"(\\mark \\markup\{)[16]=([♭♯]?[A-G])\}", "", s, count=1)
         s = s.replace(
             'keytimesignature=""',
             r"keytimesignature=\markup{ \concat { "
