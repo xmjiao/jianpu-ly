@@ -415,6 +415,7 @@ def jianpu_voice_start(isTemp=0):
     \override Accidental #'font-size = #-4
     \override TupletBracket #'bracket-visibility = ##t
     \set Voice.chordChanges = ##t %% 2.19 bug workaround
+    \override BreathingSign.text = \markup {{ \bold ˅ }} % Use down arrowhead for breathing sign
     """
 
     return r + "\n", voiceName
@@ -2510,6 +2511,9 @@ def finalize_output(out_list, need_final_barline, midi, western, not_angka):
         lambda m: m.group(1) + "1 (" if m.group(1) == m.group(2) else m.group(0),
         out_str,
     )
+
+    # Replace \breathe with \tweak Y-offset #1 \breathe
+    out_str = out_str.replace(r"\breathe", r"\tweak Y-offset #1 \breathe")
 
     return out_str
 
