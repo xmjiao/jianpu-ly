@@ -1044,11 +1044,16 @@ class NoteheadMarkup:
           """
                 % self.defines_done[figures]
             )
-            if len(figuresNew) == 1 or figures.startswith("-"):
-                ret += (
-                    f"""(make-lower-markup 0.5 (make-bold-markup "{figuresNew}")))))))
-"""
-                )
+            k = len(self.last_figures)
+            if figures.startswith("-") and k > 1:
+                # Repeat the en-dash k times vertically
+                ret += '''(markup (#:lower 0.5
+                    (#:override (cons (quote direction) 1)
+                    (#:override (cons (quote baseline-skip) 1.8)
+                    (#:dir-column (
+                    {})))))))))))'''.format("#:line (#:bold \"–\")\n" * k)
+            elif len(figuresNew) == 1 or figures.startswith("-"):
+                ret += f'(make-lower-markup 0.5 (make-bold-markup "{figuresNew}")))))))\n'
             elif not_angka and accidental:  # not chord
                 # TODO: the \ looks better than the / in default font
                 accidental_markup = {"#": "\u0338", "b": "\u20e5"}[accidental]
