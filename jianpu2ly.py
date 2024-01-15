@@ -268,7 +268,7 @@ def all_scores_start(poet1st, hasarranger):
         r += r"""
   #(define fonts
     (set-global-fonts
-     #:roman "Times New Roman,Liberation Serif,Arial Unicode MS,Noto Serif CJK SC"
+     #:roman "Noto Serif CJK SC,Liberation Serif,SimSun,Times New Roman,Arial Unicode MS"
      #:factor (/ staff-height pt 20)
     ))
 """
@@ -415,7 +415,7 @@ def jianpu_voice_start(isTemp=0):
     \override Accidental #'font-size = #-4
     \override TupletBracket #'bracket-visibility = ##t
     \set Voice.chordChanges = ##t %% 2.19 bug workaround
-    \override BreathingSign.text = \markup {{ \bold ˅ }} % Use down arrowhead for breathing sign
+    \override BreathingSign.text = \markup {{ \fontsize #-4 \musicglyph #"scripts.upbow" }}
     """
 
     return r + "\n", voiceName
