@@ -269,7 +269,7 @@ def all_scores_start(poet1st, hasarranger):
   #(define fonts
     (set-global-fonts
      #:roman "Noto Sans CJK SC,Times New Roman,Arial Unicode MS"
-     #:sans "Noto Sans CJK SC,Times New Roman,Arial Unicode MS"
+     #:sans "Noto Sans CJK SC,Arial Unicode MS,Times New Roman"
      #:factor (/ staff-height pt 20)
     ))
 """
