@@ -1237,7 +1237,7 @@ class NoteheadMarkup:
                 "": "",
                 "'": "^.",
                 "''": r"-\tweak #'X-offset #0.3 ^\markup{\bold :}",
-                ",": r"-\tweak #'X-offset #0.6 _\markup{\bold .}",
+                ",": r"-\tweak #'X-offset #0.3 _\markup{\bold .}",
                 ",,": r"-\tweak #'X-offset #0.3 _\markup{\bold :}",
             }
             if not_angka:
