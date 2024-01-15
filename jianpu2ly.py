@@ -107,7 +107,7 @@ from string import ascii_letters as letters
 from subprocess import getoutput
 
 # Control options
-bar_number_every = 1
+bar_number_every = 0
 midiInstrument = "choir aahs"  # see  https://lilypond.org/doc/v2.24/Documentation/notation/midi-instruments
 padding = 3
 
@@ -301,7 +301,7 @@ def score_start():
     if midi:
         ret += "\\unfoldRepeats\n"
     ret += r"<< "
-    if not notehead_markup.noBarNums and not midi:
+    if bar_number_every and not notehead_markup.noBarNums and not midi:
         ret += (
             f"\\override Score.BarNumber #'break-visibility = #end-of-line-invisible\n\\set Score.barNumberVisibility = #(every-nth-bar-number-visible {bar_number_every})"
         )
@@ -3158,8 +3158,8 @@ def parse_arguments():
         "-b",
         "--bar-number-every",
         type=int,
-        default=1,
-        help="option to set bar number, default is 1",
+        default=0,
+        help="option to set bar number, default is 0 for beginning of each line",
     )
     parser.add_argument(
         "-i",
