@@ -485,6 +485,7 @@ def jianpu_staff_start(inst=None, withStaff=False):
     r += j
     r += r"""
     \override Staff.TimeSignature #'style = #'numbered
+    \override Staff.TimeSignature.stencil = #ly:text-interface::print
     \once \omit Staff.TimeSignature
     \override Staff.Stem #'transparent = ##t
     """
@@ -3073,7 +3074,7 @@ def reformat_key_time_signatures(s, with_staff):
         # Replace remaining time signatures using fractions
         s = re.sub(
             r"\\time\s+(\d+)/(\d+)",
-            r"\\override Staff.TimeSignature.stencil = #ly:text-interface::print \\override Staff.TimeSignature.text = \\markup { \\translate #'(0 . -0.5) \\bold \\fontsize #2 \\fraction \1 \2} \\time \1/\2",
+            r"\\override Staff.TimeSignature.text = \\markup { \\translate #'(0 . -0.5) \\bold \\fontsize #2 \\fraction \1 \2} \\time \1/\2",
             s,
         )
 
