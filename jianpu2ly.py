@@ -1238,16 +1238,17 @@ class NoteheadMarkup:
                     "": "",
                     "'": "^.",
                     "''": r"-\tweak #'X-offset #0.3 ^\markup{\bold :}",
-                    ",": r"-\tweak #'X-offset #0.45 _\markup{\bold .}",
-                    ",,": r"-\tweak #'X-offset #0.45 _\markup{\bold :}",
+                    # Need to move it further right to avoid LilyPond put dot too low
+                    ",": r"""-\tweak #'X-offset #0.54 _\markup{\musicglyph #"dots.dot"}""",
+                    ",,": r"-\tweak #'X-offset #0.54 _\markup{\fontsize #2 \bold :}",
                 }
             else:
                 oDict = {
                     "": "",
                     "'": "^.",
                     "''": r"-\tweak #'X-offset #0.3 ^\markup{\bold :}",
-                    ",": r"-\tweak #'X-offset #0.3 _\markup{\bold .}",
-                    ",,": r"-\tweak #'X-offset #0.3 _\markup{\bold :}",
+                    ",": r"""-\tweak #'X-offset #0.3 _\markup{\musicglyph #"dots.dot"}""",
+                    ",,": r"-\tweak #'X-offset #0.3 _\markup{\fontsize #2 \bold :}",
                 }
             if not_angka:
                 oDict.update(
