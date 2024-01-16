@@ -10,6 +10,9 @@ fi
 install_packages() {
     sudo apt-get -q -y update > /dev/null 2>&1
     sudo apt-get -q -y install poppler-utils timidity lame fonts-noto-cjk > /dev/null 2>&1
+    # Install Microsoft fonts
+    echo ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true | sudo debconf-set-selections
+    sudo apt-get -q -y install ttf-mscorefonts-installer > /dev/null 2>&1
     wget -q -O /tmp/arial-unicode-ms.zip "https://dw.fontdafont.com/download/arial-unicode-ms-font"
     sudo unzip -q /tmp/arial-unicode-ms.zip -d /usr/share/fonts/truetype
     sudo fc-cache -f
