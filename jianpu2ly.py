@@ -1230,20 +1230,20 @@ class NoteheadMarkup:
             # Tweak the Y-offset, as Lilypond occasionally puts it too far down:
             if not nBeams:
                 ret += {
-                    ",": r"-\tweak #'Y-offset #-1.2 ",
                     ",,": r"-\tweak #'Y-offset #1 ",
                 }.get(octave, "")
             oDict = {
                 "": "",
                 "'": "^.",
                 "''": r"-\tweak #'X-offset #0.3 ^\markup{\bold :}",
-                ",": r"-\tweak #'X-offset #0.3 _\markup{\bold .}",
+                # Use unicode U+00B7 "middle dot" character for lower octave
+                ",": r"-\tweak #'X-offset #0.25 _\markup{\bold \fontsize #3 ·}",
                 ",,": r"-\tweak #'X-offset #0.3 _\markup{\bold :}",
             }
             if not_angka:
                 oDict.update(
                     {
-                        "'": r"-\tweak #'extra-offset #'(0.4 . 2.7) -\markup{\bold .}",
+                        "'": r"-\tweak #'extra-offset #'(0.4 . 2.7) -\markup{\bold \fontsize #2 ·}",
                         "''": r"-\tweak #'extra-offset #'(0.4 . 3.5) -\markup{\bold :}",
                     }
                 )
