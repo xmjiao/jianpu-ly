@@ -105,7 +105,7 @@ if ! command -v mscore &> /dev/null; then
 fi
 
 # Download the jianpu2ly.py script
-wget -q -O jianpu2ly.py https://raw.githubusercontent.com/xmjiao/jianpu2ly/master/jianpu2ly.py
+wget -q -O jianpu2ly.py https://raw.githubusercontent.com/xmjiao/jianpu2ly/fixfonts/jianpu2ly.py
 
 # Remove existing .ly files
 rm -f *.ly
