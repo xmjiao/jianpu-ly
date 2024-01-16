@@ -264,12 +264,16 @@ def all_scores_start(poet1st, hasarranger):
   right-margin = 25\mm
 """
     )
+    # Note: For consistency across platforms,
+    # Make sure to install Noto Serif CJK SC (regular and bold)
+    # and Noto Sans CJK SC (regular and bold) from https://fonts.google.com/
+    # On Ubuntu, the fonts can be installed by running `apt install fonts-noto-cjk`
     if lilypond_minor_version() >= 20:
         r += r"""
   #(define fonts
     (set-global-fonts
-     #:roman "Noto Sans CJK SC,Times New Roman,Arial Unicode MS"
-     #:sans "Noto Sans CJK SC,Arial Unicode MS,Times New Roman"
+     #:roman "Noto Serif CJK SC,Times New Roman"
+     #:sans "Noto Sans CJK SC,Arial Unicode MS"
      #:factor (/ staff-height pt 20)
     ))
 """
@@ -1229,17 +1233,21 @@ class NoteheadMarkup:
         if not midi and not western and not invisTieLast:
             # Tweak the Y-offset, as Lilypond occasionally puts it too far down:
             if not nBeams:
-                ret += {
-                    ",,": r"-\tweak #'Y-offset #1 ",
-                }.get(octave, "")
-            oDict = {
-                "": "",
-                "'": "^.",
-                "''": r"-\tweak #'X-offset #0.3 ^\markup{\bold :}",
-                # Use unicode U+00B7 "middle dot" character for lower octave
-                ",": r"-\tweak #'X-offset #0.25 _\markup{\bold \fontsize #3 ·}",
-                ",,": r"-\tweak #'X-offset #0.3 _\markup{\bold :}",
-            }
+                oDict = {
+                    "": "",
+                    "'": "^.",
+                    "''": r"-\tweak #'X-offset #0.3 ^\markup{\bold :}",
+                    ",": r"-\tweak #'X-offset #0.45 _\markup{\bold .}",
+                    ",,": r"-\tweak #'X-offset #0.45 _\markup{\bold :}",
+                }
+            else:
+                oDict = {
+                    "": "",
+                    "'": "^.",
+                    "''": r"-\tweak #'X-offset #0.3 ^\markup{\bold :}",
+                    ",": r"-\tweak #'X-offset #0.3 _\markup{\bold .}",
+                    ",,": r"-\tweak #'X-offset #0.3 _\markup{\bold :}",
+                }
             if not_angka:
                 oDict.update(
                     {
