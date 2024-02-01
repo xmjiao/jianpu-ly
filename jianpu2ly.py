@@ -1883,14 +1883,18 @@ def convert_ties_to_slurs(jianpu):
         parts = [part.rstrip() for part in parts]
 
         # Construct the slur by wrapping all but the first part in parentheses
-        slur_content = parts[0] + " ( " + " ".join(parts[1:]) + " )"
+        if lilypond_minor_version() >= 20:
+            # In Lilypond 20+, we can tag the parentheses
+            # so they won't conflict with other slurs.
+            slur_content = parts[0] + r' \=JianpuTie( ' + " ".join(parts[1:]) + r' \=JianpuTie)'
+        else: slur_content = parts[0] + " ( " + " ".join(parts[1:]) + " )"
 
         # Ensure we don't have multiple spaces in a row, but preserve newlines
         slur_content = re.sub(r"[ \t\f\v]{2,}", " ", slur_content)
 
         # Move parenthesis before dashes
         slur_content = re.sub(
-            r'((?:(?:\s+-)(?:\s+[\^_]"[^"]*")*' + r")+)(\s+[\(\)])",
+            r'((?:(?:\s+-)(?:\s+[\^_]"[^"]*")*' + r")+)(\s+(?:\\=JianpuTie)?[\(\)])",
             r"\2\1",
             slur_content,
         )
