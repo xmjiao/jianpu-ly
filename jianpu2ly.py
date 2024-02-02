@@ -100,7 +100,6 @@ import tempfile
 import argparse
 import requests
 import subprocess
-import six
 
 from fractions import Fraction as F
 from string import ascii_letters as letters
@@ -122,9 +121,9 @@ def as_unicode(input_string):
     Returns:
         The input in Unicode format.
     """
-    if isinstance(input_string, six.text_type):
+    if isinstance(input_string, str):
         return input_string
-    elif isinstance(input_string, six.binary_type):
+    elif isinstance(input_string, bytes):
         return input_string.decode("utf-8")
     else:
         raise TypeError(f"Expected unicode or bytes, got {input_string}")
