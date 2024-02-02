@@ -1829,14 +1829,11 @@ def convert_ties_to_slurs(jianpu):
     # Remove comments from the input
     jianpu = re.sub(r"%.*$", "", jianpu, flags=re.MULTILINE)
 
-    # Define the pattern to match the entire tied note sequence
-    tied_note_sequence_pattern = r"(?<!\\)\([^()]*~[^()]*\)(?<!\\)"
-
-    # protect ties within slurs
-    def protect_ties_in_slurs(match):
-        return match.group(0).replace("~", "__TIE__")
-
-    jianpu = re.sub(tied_note_sequence_pattern, protect_ties_in_slurs, jianpu)
+    if lilypond_minor_version() < 20:
+        tied_note_sequence_pattern = r"(?<!\\)\([^()]*~[^()]*\)(?<!\\)"
+        def protect_ties_in_slurs(match):
+            return match.group(0).replace("~", "__TIE__")
+        jianpu = re.sub(tied_note_sequence_pattern, protect_ties_in_slurs, jianpu)
 
     # Pattern parts:
     note_pattern = r"([qshb]?(?:[1-7][',]*)+\.?)"  # Matches a note with optional modifier [qshb], digit 1-7, optional ' or ,, and optional dot.
