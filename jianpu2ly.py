@@ -1213,7 +1213,7 @@ class NoteheadMarkup:
         self.lastNBeams = nBeams
         beamC = "\u0333" if nBeams >= 2 else "\u0332" if nBeams == 1 else ""
         self.unicode_approx.append(
-            ""
+            {'#':u"\u266f",'b':u"\u266d"}.get(accidental,u"")
             + ("-" if invisTieLast else figures[-1:])
             + (
                 ""
@@ -1230,7 +1230,7 @@ class NoteheadMarkup:
             self.barNo += 1
             self.current_accidentals = {}
         # Octave dots:
-        if not midi and not western and not invisTieLast:
+        if not midi and not western and not '-' in figures:
             # Tweak the Y-offset, as Lilypond occasionally puts it too far down:
             if not nBeams:
                 oDict = {
@@ -2082,7 +2082,7 @@ def process_fingering(word, out):
     # Mapping from textual representation to Unicode character
     finger_to_unicode = {
         "1": "\u4e00",  # Chinese numeral 1
-        "2": "\u4c8c",  # Chinese numeral 2
+        "2": "\u4e8c",  # Chinese numeral 2
         "3": "\u4e09",  # Chinese numeral 3
         "4": "\u56db",  # Chinese numeral 4
         "souyin": "\u4e45",  # Symbol for Souyin
