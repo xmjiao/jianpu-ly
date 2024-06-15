@@ -100,7 +100,6 @@ import tempfile
 import argparse
 import requests
 import subprocess
-import six
 
 from fractions import Fraction as F
 from string import ascii_letters as letters
@@ -122,9 +121,9 @@ def as_unicode(input_string):
     Returns:
         The input in Unicode format.
     """
-    if isinstance(input_string, six.text_type):
+    if isinstance(input_string, str):
         return input_string
-    elif isinstance(input_string, six.binary_type):
+    elif isinstance(input_string, bytes):
         return input_string.decode("utf-8")
     else:
         raise TypeError(f"Expected unicode or bytes, got {input_string}")
@@ -1214,7 +1213,7 @@ class NoteheadMarkup:
         self.lastNBeams = nBeams
         beamC = "\u0333" if nBeams >= 2 else "\u0332" if nBeams == 1 else ""
         self.unicode_approx.append(
-            ""
+            {'#':u"\u266f",'b':u"\u266d"}.get(accidental,u"")
             + ("-" if invisTieLast else figures[-1:])
             + (
                 ""
@@ -1231,7 +1230,7 @@ class NoteheadMarkup:
             self.barNo += 1
             self.current_accidentals = {}
         # Octave dots:
-        if not midi and not western and not invisTieLast:
+        if not midi and not western and not '-' in figures:
             # Tweak the Y-offset, as Lilypond occasionally puts it too far down:
             if not nBeams:
                 oDict = {
@@ -1830,14 +1829,11 @@ def convert_ties_to_slurs(jianpu):
     # Remove comments from the input
     jianpu = re.sub(r"%.*$", "", jianpu, flags=re.MULTILINE)
 
-    # Define the pattern to match the entire tied note sequence
-    tied_note_sequence_pattern = r"(?<!\\)\([^()]*~[^()]*\)(?<!\\)"
-
-    # protect ties within slurs
-    def protect_ties_in_slurs(match):
-        return match.group(0).replace("~", "__TIE__")
-
-    jianpu = re.sub(tied_note_sequence_pattern, protect_ties_in_slurs, jianpu)
+    if lilypond_minor_version() < 20:
+        tied_note_sequence_pattern = r"(?<!\\)\([^()]*~[^()]*\)(?<!\\)"
+        def protect_ties_in_slurs(match):
+            return match.group(0).replace("~", "__TIE__")
+        jianpu = re.sub(tied_note_sequence_pattern, protect_ties_in_slurs, jianpu)
 
     # Pattern parts:
     note_pattern = r"([qshb]?(?:[1-7][',]*)+\.?)"  # Matches a note with optional modifier [qshb], digit 1-7, optional ' or ,, and optional dot.
@@ -1883,14 +1879,18 @@ def convert_ties_to_slurs(jianpu):
         parts = [part.rstrip() for part in parts]
 
         # Construct the slur by wrapping all but the first part in parentheses
-        slur_content = parts[0] + " ( " + " ".join(parts[1:]) + " )"
+        if lilypond_minor_version() >= 20:
+            # In Lilypond 20+, we can tag the parentheses
+            # so they won't conflict with other slurs.
+            slur_content = parts[0] + r' \=JianpuTie( ' + " ".join(parts[1:]) + r' \=JianpuTie)'
+        else: slur_content = parts[0] + " ( " + " ".join(parts[1:]) + " )"
 
         # Ensure we don't have multiple spaces in a row, but preserve newlines
         slur_content = re.sub(r"[ \t\f\v]{2,}", " ", slur_content)
 
         # Move parenthesis before dashes
         slur_content = re.sub(
-            r'((?:(?:\s+-)(?:\s+[\^_]"[^"]*")*' + r")+)(\s+[\(\)])",
+            r'((?:(?:\s+-)(?:\s+[\^_]"[^"]*")*' + r")+)(\s+(?:\\=JianpuTie)?[\(\)])",
             r"\2\1",
             slur_content,
         )
@@ -2082,7 +2082,7 @@ def process_fingering(word, out):
     # Mapping from textual representation to Unicode character
     finger_to_unicode = {
         "1": "\u4e00",  # Chinese numeral 1
-        "2": "\u4c8c",  # Chinese numeral 2
+        "2": "\u4e8c",  # Chinese numeral 2
         "3": "\u4e09",  # Chinese numeral 3
         "4": "\u56db",  # Chinese numeral 4
         "souyin": "\u4e45",  # Symbol for Souyin
