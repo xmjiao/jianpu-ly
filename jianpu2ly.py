@@ -1215,12 +1215,12 @@ class NoteheadMarkup:
         self.unicode_approx.append(
             {'#':u"\u266f",'b':u"\u266d"}.get(accidental,u"")
             + ("-" if invisTieLast else figures[-1:])
+            + beamC
             + (
                 ""
                 if invisTieLast
                 else ("\u0323" if "," in octave else "\u0307" if "'" in octave else "")
             )
-            + beamC
             + "".join(c + beamC for c in dots)
             + ("" if self.inBeamGroup else " ")
         )  # (NB inBeamGroup is correct only if not midi and not western)
